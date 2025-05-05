@@ -86,7 +86,7 @@ ChunkOverloadEvent event;
 Let other plugins react to performance overloads detected by LagXpert.
 
 ## 📬 Support
-Join our Discord: https://discord.gg/YOURINVITE
+Join our Discord: https://discord.gg/xKUjn3EJzR
 
 ## 📃 License
 Free to use and modify, attribution required.
