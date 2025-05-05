@@ -1,0 +1,30 @@
+# LagXpert - ItemCleaner Configuration
+
+# ♻️ Enables automatic item clearing from the ground to reduce lag.
+enabled: true
+
+# ⏲️ Interval (in ticks) between each cleanup run.
+interval-ticks: 6000
+
+# 🌍 Worlds where item cleaning is active
+enabled-worlds:
+  - world
+  - world_nether
+  - world_the_end
+
+# 🚫 Item types to exclude from removal
+excluded-items: []
+
+# ⚠️ Warning message broadcasted X seconds before cleanup
+warning:
+  enabled: true
+  seconds-before: 10
+  message: "&e[LagXpert] &7Ground items will be cleared in &c{seconds}&7 seconds!"
+
+# 🕳 Abyss system: allows players to recover cleared items for a limited time
+abyss:
+  enabled: true
+  retention-seconds: 120           # Time items remain in the abyss (in seconds)
+  max-items-per-player: 30         # Max stored items per player
+  recover-message: "&aYou recovered &f{count} &aitem(s) from the abyss."
+  empty-message: "&7You have no items to recover."

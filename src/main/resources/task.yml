@@ -1,0 +1,7 @@
+# LagXpert - Scheduled Tasks Configuration
+
+# ⏱ Controls how frequently the plugin checks all loaded chunks to detect overloads.
+# The interval is in ticks (20 ticks = 1 second).
+
+task:
+  scan-interval-ticks: 600   # Delay between automatic scans of all loaded chunks

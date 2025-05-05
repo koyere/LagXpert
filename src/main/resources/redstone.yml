@@ -1,0 +1,8 @@
+# LagXpert - Redstone Control Configuration
+
+# ⚡ Prevents redstone wires and devices from staying active for too long,
+# which can cause excessive lag if abused.
+
+control:
+  enabled: true                # Enable redstone overload detection
+  redstone-active-ticks: 100   # Max duration (in ticks) a redstone wire may remain powered

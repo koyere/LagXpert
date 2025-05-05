@@ -1,0 +1,9 @@
+# LagXpert - Storage Limits Configuration
+
+# 📦 These limits control how many storage-related blocks can be placed per chunk.
+# Placement will be denied if the count exceeds the configured limit.
+
+limits:
+  hoppers-per-chunk: 8     # Limit of hoppers per chunk
+  chests-per-chunk: 20     # Limit of chests per chunk
+  furnaces-per-chunk: 10   # Limit of furnaces per chunk

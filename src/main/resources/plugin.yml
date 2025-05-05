@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────
+#  ✅ LagXpert - Plugin Metadata & Definitions
+#  Developed by Koyere
+#  Version: 1.0.0
+# ──────────────────────────────────────────────
+
+name: LagXpert
+main: me.koyere.lagxpert.LagXpert
+version: 1.0.0
+api-version: 1.16
+
+# 🌐 Plugin Information
+description: Monitor and control lag sources like chunk loads, redstone, entities and storage blocks.
+author: Koyere
+website: https://www.spigotmc.org/resources/lagxpert.00000/
+
+# ──────────────────────────────────────────────
+# ⚙️ Commands
+# ──────────────────────────────────────────────
+commands:
+
+  # 🎛 Main command
+  lagxpert:
+    description: Main command for LagXpert plugin
+    usage: /lagxpert <chunkload|inspect|reload|help>
+    permission: lagxpert.use
+
+  # 🧩 Player-friendly chunk usage status
+  chunkstatus:
+    description: Shows current chunk usage to players
+    usage: /chunkstatus
+    permission: lagxpert.use
+
+  # 🕳 Recover items recently cleared from the ground
+  abyss:
+    description: Recover recently cleared items from the ground
+    usage: /abyss
+    permission: lagxpert.abyss
+
+# ──────────────────────────────────────────────
+# 🔐 Permissions
+# ──────────────────────────────────────────────
+permissions:
+
+  # 🔓 General access to /lagxpert and /chunkstatus
+  lagxpert.use:
+    description: Allows basic usage of LagXpert commands
+    default: true
+
+  # 🛠 Admin-level commands (inspect, reload, bypass limits)
+  lagxpert.admin:
+    description: Allows access to administrative inspection and reload
+    default: op
+
+  # 🕳 Recovery system via /abyss
+  lagxpert.abyss:
+    description: Allows players to recover their cleared items using /abyss
+    default: true
+
+  # ⛔ Bypass permissions per module
+  lagxpert.bypass.mobs:
+    description: Exempts the player from mob spawn limits
+    default: false
+
+  lagxpert.bypass.hoppers:
+    description: Exempts the player from hopper placement limits
+    default: false
+
+  lagxpert.bypass.chests:
+    description: Exempts the player from chest placement limits
+    default: false
+
+  lagxpert.bypass.furnaces:
+    description: Exempts the player from furnace placement limits
+    default: false
+
+  lagxpert.bypass.redstone:
+    description: Exempts the player from redstone limitation actions
+    default: false

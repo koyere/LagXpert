@@ -1,0 +1,13 @@
+# LagXpert - General Configuration
+
+# 🧩 Modules activation
+modules:
+  mobs: true
+  storage: true
+  redstone: true
+  alerts: true
+  task: true
+
+# 🛡 Permissions & control
+permissions:
+  bypass-enabled: true

@@ -1,0 +1,6 @@
+# LagXpert - Mob Limits Configuration
+
+# 🧟 Maximum number of living entities (e.g., mobs, animals) allowed per chunk
+# If the number exceeds this value, spawning is blocked and players are notified (if enabled).
+limits:
+  mobs-per-chunk: 40

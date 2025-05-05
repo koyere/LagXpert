@@ -1,0 +1,41 @@
+# LagXpert Free - Customizable Messages File
+
+# 🔷 Prefix used in all plugin messages
+prefix: "&7[&bLagXpert&7] "
+
+# 📊 Chunk load status
+chunkload:
+  info: "&aChunk usage: &e{entities} mobs&7, &e{hoppers} hoppers&7, &e{chests} chests&7."
+  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks."
+
+# 🔍 Inspect command messages
+inspect:
+  no-permission: "&cYou do not have permission to inspect chunks."
+  usage: "&eUse: /lagxpert inspect <chunkX,chunkZ>"
+
+# ⚠️ General command feedback
+general:
+  no-permission: "&cYou don't have permission to use this command."
+  invalid-command: "&cUnknown subcommand. Use /lagxpert <chunkload|inspect|reload|help>."
+
+# 🚫 Limit-related warnings
+limits:
+  hopper: "&cHopper limit reached in this chunk."
+  chest: "&cChest limit reached in this chunk."
+  furnace: "&cFurnace limit reached in this chunk."
+  mobs: "&cMob spawn limit reached in this chunk."
+  redstone: "&cRedstone component forcibly disabled (lag prevention)."
+  near-limit: "&e[!] This chunk is nearing its limit: &f{used}&7/&f{max}"
+
+# 🔄 Reload feedback
+reload:
+  success: "&aConfiguration and messages reloaded successfully."
+
+# 📘 Help menu (optional override for /lagxpert help)
+help:
+  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.0.0 &8- &fHelp Menu"
+  inspect: " &e/lagxpert inspect <x,z> &8- &7Inspect chunk info"
+  chunkstatus: " &e/chunkstatus &8- &7Show current chunk usage"
+  abyss: " &e/abyss &8- &7Recover recently cleared items"
+  reload: " &e/lagxpert reload &8- &7Reload all config files"
+  footer: "&8&m------------------------------------------"

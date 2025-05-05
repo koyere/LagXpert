@@ -1,0 +1,7 @@
+# LagXpert - Player Alert System
+
+# 🔔 Configure if players should receive warning messages when chunks exceed safe limits.
+# These alerts are visible only to nearby players inside the affected chunk.
+
+alerts:
+  enabled: true     # Enable or disable all alerts (chunk overload warnings)
