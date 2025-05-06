@@ -1,18 +1,18 @@
 # ──────────────────────────────────────────────
 #  ✅ LagXpert - Plugin Metadata & Definitions
 #  Developed by Koyere
-#  Version: 1.0.0
+#  Version: 1.1.0
 # ──────────────────────────────────────────────
 
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 1.0.0
+version: 1.1
 api-version: 1.16
 
 # 🌐 Plugin Information
 description: Monitor and control lag sources like chunk loads, redstone, entities and storage blocks.
 author: Koyere
-website: https://www.spigotmc.org/resources/lagxpert.00000/
+website: https://www.spigotmc.org/resources/lagxpert-free.124725/
 
 # ──────────────────────────────────────────────
 # ⚙️ Commands
@@ -37,6 +37,12 @@ commands:
     usage: /abyss
     permission: lagxpert.abyss
 
+  # 🧹 Manual cleanup of ground items
+  clearitems:
+    description: Manually trigger ground item cleanup
+    usage: /clearitems
+    permission: lagxpert.clearitems
+
 # ──────────────────────────────────────────────
 # 🔐 Permissions
 # ──────────────────────────────────────────────
@@ -56,6 +62,11 @@ permissions:
   lagxpert.abyss:
     description: Allows players to recover their cleared items using /abyss
     default: true
+
+  # 🧹 Manual execution of item cleanup
+  lagxpert.clearitems:
+    description: Allows manual execution of ground item cleanup
+    default: op
 
   # ⛔ Bypass permissions per module
   lagxpert.bypass.mobs:

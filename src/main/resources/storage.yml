@@ -1,9 +1,23 @@
-# LagXpert - Storage Limits Configuration
+# ──────────────────────────────────────────────
+#  📦 LagXpert - Storage Limits Configuration
+# ──────────────────────────────────────────────
+# These limits control how many storage-related blocks
+# can be placed per chunk. When exceeded, warnings
+# or restrictions may apply (if configured).
 
-# 📦 These limits control how many storage-related blocks can be placed per chunk.
-# Placement will be denied if the count exceeds the configured limit.
+enabled: true
 
 limits:
-  hoppers-per-chunk: 8     # Limit of hoppers per chunk
-  chests-per-chunk: 20     # Limit of chests per chunk
-  furnaces-per-chunk: 10   # Limit of furnaces per chunk
+  chests-per-chunk: 20       # Regular chests
+  hoppers-per-chunk: 8       # Hoppers
+  furnaces-per-chunk: 10     # Standard furnaces
+
+  blast_furnaces-per-chunk: 6      # Blast furnaces
+  droppers-per-chunk: 10           # Droppers
+  dispensers-per-chunk: 10         # Dispensers
+  observers-per-chunk: 10          # Observers
+  shulker_boxes-per-chunk: 5       # Shulker boxes
+
+  hopper_minecarts-per-chunk: 4    # Hopper minecarts (optional)
+  pistons-per-chunk: 12            # Pistons (sticky or normal)
+  tnt-per-chunk: 6                 # TNT blocks (optional)

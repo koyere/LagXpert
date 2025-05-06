@@ -6,7 +6,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,6 +70,10 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
 
         if (sender.hasPermission("lagxpert.abyss")) {
             sender.sendMessage(MessageManager.get("help.abyss"));
+        }
+
+        if (sender.hasPermission("lagxpert.clearitems")) {
+            sender.sendMessage(MessageManager.get("help.clearitems"));
         }
 
         if (sender.hasPermission("lagxpert.admin")) {

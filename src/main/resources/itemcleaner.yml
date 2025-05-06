@@ -4,6 +4,7 @@
 enabled: true
 
 # ⏲️ Interval (in ticks) between each cleanup run.
+# ⚠️ Warning: DO NOT set below 600 ticks (30s), may cause lag or server overload.
 interval-ticks: 6000
 
 # 🌍 Worlds where item cleaning is active

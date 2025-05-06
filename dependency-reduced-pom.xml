@@ -4,7 +4,7 @@
   <groupId>me.koyere</groupId>
   <artifactId>LagXpert</artifactId>
   <name>LagXpert</name>
-  <version>1.0.0</version>
+  <version>1.1</version>
   <description>Free plugin to control lag sources on Minecraft servers</description>
   <url>https://github.com/koyere/LagXpert</url>
   <build>
@@ -33,6 +33,17 @@
                   <shadedPattern>me.koyere.lagxpert.libs.bstats</shadedPattern>
                 </relocation>
               </relocations>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                  </excludes>
+                </filter>
+              </filters>
             </configuration>
           </execution>
         </executions>
@@ -47,4 +58,7 @@
       <scope>provided</scope>
     </dependency>
   </dependencies>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
 </project>

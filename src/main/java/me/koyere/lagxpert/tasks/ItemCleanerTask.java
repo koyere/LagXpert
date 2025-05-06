@@ -1,21 +1,24 @@
 package me.koyere.lagxpert.tasks;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.system.AbyssManager;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
  * Periodically removes dropped items from the ground to reduce lag.
  * Excludes specific item types and supports per-world filtering.
+ * Sends broadcast messages and integrates Abyss persistent recovery system.
  */
 public class ItemCleanerTask extends BukkitRunnable {
 
@@ -41,10 +44,26 @@ public class ItemCleanerTask extends BukkitRunnable {
     }
 
     /**
-     * Executes the cleanup task, removing dropped items not excluded by config.
+     * Executes the automatic cleanup task.
      */
     @Override
     public void run() {
+        int totalRemoved = runCleanupInternal(null);
+
+        if (totalRemoved > 0) {
+            String msg = ChatColor.translateAlternateColorCodes('&',
+                    "&a[LagXpert] &fCleared &e" + totalRemoved + " &fground item(s).");
+            Bukkit.broadcastMessage(msg);
+        }
+    }
+
+    /**
+     * Core cleanup logic, optionally associating cleared items to a player for recovery.
+     *
+     * @param actor The player responsible (used when triggered manually), or null if automatic
+     * @return number of removed items
+     */
+    private int runCleanupInternal(Player actor) {
         int totalRemoved = 0;
 
         for (World world : Bukkit.getWorlds()) {
@@ -54,18 +73,26 @@ public class ItemCleanerTask extends BukkitRunnable {
                 ItemStack stack = item.getItemStack();
                 if (stack == null || excludedItems.contains(stack.getType().name())) continue;
 
+                // 🔁 Register in Abyss system (persistent version)
+                if (actor != null) {
+                    AbyssManager.add(actor, stack);
+                } else if (item.getThrower() != null) {
+                    Player thrower = Bukkit.getPlayer(item.getThrower());
+                    if (thrower != null) {
+                        AbyssManager.add(thrower, stack);
+                    }
+                }
+
                 item.remove();
                 totalRemoved++;
             }
         }
 
-        if (totalRemoved > 0) {
-            Bukkit.broadcastMessage("§a[LagXpert] §fCleared §e" + totalRemoved + " §fground item(s).");
-        }
+        return totalRemoved;
     }
 
     /**
-     * Schedules a warning broadcast message before the next cleanup.
+     * Public method to schedule a broadcast warning before cleanup.
      */
     public static void scheduleWarning() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "itemcleaner.yml");
@@ -79,12 +106,24 @@ public class ItemCleanerTask extends BukkitRunnable {
 
         String msg = config.getString("warning.message", "&e[LagXpert] &7Items will be cleared in &c{seconds}&7s.")
                 .replace("{seconds}", String.valueOf(secondsBefore));
+        String coloredMsg = ChatColor.translateAlternateColorCodes('&', msg);
 
         new BukkitRunnable() {
             @Override
             public void run() {
-                Bukkit.broadcastMessage(msg);
+                Bukkit.broadcastMessage(coloredMsg);
             }
         }.runTaskLater(LagXpert.getInstance(), delay);
+    }
+
+    /**
+     * Triggers cleanup manually with player context (for /clearitems).
+     *
+     * @param actor The player triggering the cleanup
+     * @return number of removed items
+     */
+    public static int runManualCleanup(Player actor) {
+        ItemCleanerTask task = new ItemCleanerTask();
+        return task.runCleanupInternal(actor);
     }
 }

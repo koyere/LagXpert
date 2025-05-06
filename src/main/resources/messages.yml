@@ -33,9 +33,16 @@ reload:
 
 # 📘 Help menu (optional override for /lagxpert help)
 help:
-  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.0.0 &8- &fHelp Menu"
+  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.1 &8- &fHelp Menu"
   inspect: " &e/lagxpert inspect <x,z> &8- &7Inspect chunk info"
   chunkstatus: " &e/chunkstatus &8- &7Show current chunk usage"
   abyss: " &e/abyss &8- &7Recover recently cleared items"
   reload: " &e/lagxpert reload &8- &7Reload all config files"
+  clearitems: " &e/clearitems &8- &7Manually clear dropped items"
   footer: "&8&m------------------------------------------"
+
+# 🧹 Clearitems command
+clearitems:
+  start: "&aManual cleanup started..."
+  removed: "&e{count} &fground item(s) removed."
+  broadcast: "&bLagXpert: &7Admin manually triggered item cleanup. &e{count} &7items removed."

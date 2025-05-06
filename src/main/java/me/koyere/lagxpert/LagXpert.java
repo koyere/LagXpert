@@ -2,6 +2,7 @@ package me.koyere.lagxpert;
 
 import me.koyere.lagxpert.commands.*;
 import me.koyere.lagxpert.listeners.*;
+import me.koyere.lagxpert.system.AbyssManager;
 import me.koyere.lagxpert.tasks.AutoChunkScanTask;
 import me.koyere.lagxpert.tasks.ItemCleanerTask;
 import me.koyere.lagxpert.utils.ConfigManager;
@@ -24,8 +25,6 @@ public class LagXpert extends JavaPlugin {
 
     /**
      * Returns the static instance of this plugin.
-     *
-     * @return plugin instance
      */
     public static LagXpert getInstance() {
         return instance;
@@ -35,7 +34,9 @@ public class LagXpert extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
-        // Save default config and modular resources if missing
+        // ──────────────────────────────────────────────
+        // 📂 Save default configuration files (if missing)
+        // ──────────────────────────────────────────────
         saveDefaultConfig();
         saveResource("mobs.yml", false);
         saveResource("storage.yml", false);
@@ -45,17 +46,23 @@ public class LagXpert extends JavaPlugin {
         saveResource("messages.yml", false);
         saveResource("itemcleaner.yml", false);
 
-        // Load all configuration and language files
+        // 🔄 Load config and messages
         ConfigManager.loadAll();
         MessageManager.loadMessages();
+        AbyssManager.loadConfig(); // ✅ Carga configuración y asegura existencia de /data/abyss
 
-        // Register base commands
+        // ──────────────────────────────────────────────
+        // 🧭 Register commands
+        // ──────────────────────────────────────────────
         getCommand("lagxpert").setExecutor(new LagXpertCommand());
         getCommand("lagxpert").setTabCompleter(new LagXpertCommand());
         getCommand("chunkstatus").setExecutor(new ChunkStatusCommand());
         getCommand("abyss").setExecutor(new AbyssCommand());
+        getCommand("clearitems").setExecutor(new ClearItemsCommand()); // ✅ Comando manual de limpieza
 
-        // Register module-specific listeners if enabled in config
+        // ──────────────────────────────────────────────
+        // 🧩 Register listeners by module activation
+        // ──────────────────────────────────────────────
         if (ConfigManager.isRedstoneControlEnabled()) {
             getServer().getPluginManager().registerEvents(new RedstoneListener(), this);
         }
@@ -66,25 +73,29 @@ public class LagXpert extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new EntityListener(), this);
         }
 
-        // Start automatic chunk scanning task if enabled
+        // ──────────────────────────────────────────────
+        // 🔁 Start chunk scanning task (if enabled)
+        // ──────────────────────────────────────────────
         if (ConfigManager.isTaskModuleEnabled()) {
             long interval = ConfigManager.getScanIntervalTicks();
-            new AutoChunkScanTask().runTaskTimer(this, 100L, interval); // ✅ Usar BukkitRunnable correctamente
+            new AutoChunkScanTask().runTaskTimer(this, 100L, interval);
         }
 
-        // Start item cleaner task if enabled
+        // 🧹 Start item cleaner task (if enabled)
         File itemCleanerFile = new File(getDataFolder(), "itemcleaner.yml");
         FileConfiguration itemCleanerConfig = loadYaml(itemCleanerFile);
 
         if (itemCleanerConfig.getBoolean("enabled", true)) {
             int ticks = itemCleanerConfig.getInt("interval-ticks", 6000);
+
             if (itemCleanerConfig.getBoolean("warning.enabled", true)) {
                 ItemCleanerTask.scheduleWarning();
             }
+
             new ItemCleanerTask().runTaskTimer(this, ticks, ticks);
         }
 
-        // Initialize bStats metrics
+        // 📊 Initialize bStats metrics
         int pluginId = 25746;
         new Metrics(this, pluginId);
 

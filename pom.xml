@@ -6,15 +6,20 @@
 
     <groupId>me.koyere</groupId>
     <artifactId>LagXpert</artifactId>
-    <version>1.0.0</version>
+    <version>1.1</version>
     <packaging>jar</packaging>
 
     <name>LagXpert</name>
     <description>Free plugin to control lag sources on Minecraft servers</description>
     <url>https://github.com/koyere/LagXpert</url>
 
+    <!-- ✅ Establece codificación universal para evitar advertencias de encoding -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
     <dependencies>
-        <!-- Spigot API (provided at runtime by the server) -->
+        <!-- Spigot API (provided at runtime) -->
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
@@ -22,7 +27,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- bStats Metrics -->
+        <!-- bStats (solo si no se incluyen manualmente en el plugin) -->
         <dependency>
             <groupId>org.bstats</groupId>
             <artifactId>bstats-bukkit</artifactId>
@@ -32,7 +37,7 @@
 
     <build>
         <plugins>
-            <!-- Compiler plugin with Java 17 compatibility -->
+            <!-- ✅ Compilador con soporte para Java 17 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -43,7 +48,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Shade plugin to embed bStats in the final JAR -->
+            <!-- ✅ Maven Shade Plugin con filtros para evitar advertencias -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -51,7 +56,9 @@
                 <executions>
                     <execution>
                         <phase>package</phase>
-                        <goals><goal>shade</goal></goals>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
                         <configuration>
                             <relocations>
                                 <relocation>
@@ -59,6 +66,18 @@
                                     <shadedPattern>me.koyere.lagxpert.libs.bstats</shadedPattern>
                                 </relocation>
                             </relocations>
+                            <!-- ✅ Evita advertencias por recursos duplicados -->
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

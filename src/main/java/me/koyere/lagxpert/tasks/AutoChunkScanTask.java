@@ -10,11 +10,18 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Minecart;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
- * Scheduled task that scans all loaded chunks and alerts players
- * if any chunk exceeds mob, hopper, or storage limits.
+ * Scheduled task that scans loaded chunks for over-limit elements.
+ * Now optimized to skip chunks without nearby players to improve performance.
  */
 public class AutoChunkScanTask extends BukkitRunnable {
 
@@ -23,32 +30,71 @@ public class AutoChunkScanTask extends BukkitRunnable {
         if (!ConfigManager.areAlertsEnabled()) return;
 
         for (World world : Bukkit.getWorlds()) {
-            for (Chunk chunk : world.getLoadedChunks()) {
-                int mobCount = countLivingEntities(chunk);
-                int hopperCount = countBlocks(chunk, Material.HOPPER);
-                int chestCount = countBlocks(chunk, Material.CHEST);
-                int furnaceCount = countBlocks(chunk, Material.FURNACE);
+            List<Player> players = world.getPlayers();
+            if (players.isEmpty()) continue; // Skip world if no players online
 
+            for (Chunk chunk : world.getLoadedChunks()) {
+                // Skip chunks far from players
+                boolean playerNear = players.stream()
+                        .anyMatch(p -> p.getLocation().distanceSquared(chunk.getBlock(8, 64, 8).getLocation()) <= (48 * 48));
+                if (!playerNear) continue;
+
+                int mobCount = countLivingEntities(chunk);
+
+                // Count blocks of interest
+                Map<Material, Integer> blockCounts = new LinkedHashMap<>();
+                blockCounts.put(Material.HOPPER, countBlocks(chunk, Material.HOPPER));
+                blockCounts.put(Material.CHEST, countBlocks(chunk, Material.CHEST));
+                blockCounts.put(Material.FURNACE, countBlocks(chunk, Material.FURNACE));
+                blockCounts.put(Material.BLAST_FURNACE, countBlocks(chunk, Material.BLAST_FURNACE));
+                blockCounts.put(Material.SHULKER_BOX, countBlocks(chunk, Material.SHULKER_BOX));
+                blockCounts.put(Material.DROPPER, countBlocks(chunk, Material.DROPPER));
+                blockCounts.put(Material.DISPENSER, countBlocks(chunk, Material.DISPENSER));
+                blockCounts.put(Material.OBSERVER, countBlocks(chunk, Material.OBSERVER));
+                blockCounts.put(Material.BARREL, countBlocks(chunk, Material.BARREL));
+                blockCounts.put(Material.PISTON, countBlocks(chunk, Material.PISTON));
+                blockCounts.put(Material.TNT, countBlocks(chunk, Material.TNT));
+
+                int hopperMinecartCount = countHopperMinecarts(chunk);
+
+                // Fire overload events
                 if (mobCount > ConfigManager.getMaxMobsPerChunk()) {
                     fireChunkOverloadEvent(chunk, "mobs");
                 }
-                if (hopperCount > ConfigManager.getMaxHoppersPerChunk()) {
+
+                if (blockCounts.get(Material.HOPPER) > ConfigManager.getMaxHoppersPerChunk()) {
                     fireChunkOverloadEvent(chunk, "hoppers");
                 }
-                if (chestCount > ConfigManager.getMaxChestsPerChunk()) {
+                if (blockCounts.get(Material.CHEST) > ConfigManager.getMaxChestsPerChunk()) {
                     fireChunkOverloadEvent(chunk, "chests");
                 }
-                if (furnaceCount > ConfigManager.getMaxFurnacesPerChunk()) {
+                if (blockCounts.get(Material.FURNACE) > ConfigManager.getMaxFurnacesPerChunk()) {
                     fireChunkOverloadEvent(chunk, "furnaces");
                 }
 
+                // Prepare message for overloaded chunk
                 boolean alertNeeded = mobCount > ConfigManager.getMaxMobsPerChunk()
-                        || hopperCount > ConfigManager.getMaxHoppersPerChunk()
-                        || chestCount > ConfigManager.getMaxChestsPerChunk()
-                        || furnaceCount > ConfigManager.getMaxFurnacesPerChunk();
+                        || blockCounts.get(Material.HOPPER) > ConfigManager.getMaxHoppersPerChunk()
+                        || blockCounts.get(Material.CHEST) > ConfigManager.getMaxChestsPerChunk()
+                        || blockCounts.get(Material.FURNACE) > ConfigManager.getMaxFurnacesPerChunk();
 
                 if (alertNeeded) {
-                    alertNearbyPlayers(chunk, mobCount, hopperCount, chestCount, furnaceCount);
+                    StringBuilder msg = new StringBuilder(MessageManager.getPrefix())
+                            .append("&cLag warning in chunk [&f")
+                            .append(chunk.getX()).append("&7, &f").append(chunk.getZ()).append("&c]&7: ")
+                            .append("&e").append(mobCount).append(" mobs&7");
+
+                    blockCounts.forEach((mat, count) -> {
+                        if (count > 0) {
+                            msg.append(", &e").append(count).append(" ").append(getFriendlyName(mat)).append("&7");
+                        }
+                    });
+
+                    if (hopperMinecartCount > 0) {
+                        msg.append(", &e").append(hopperMinecartCount).append(" Hopper Minecarts&7");
+                    }
+
+                    broadcastToNearbyPlayers(chunk, msg.toString());
                 }
             }
         }
@@ -56,8 +102,8 @@ public class AutoChunkScanTask extends BukkitRunnable {
 
     private int countLivingEntities(Chunk chunk) {
         int count = 0;
-        for (Entity e : chunk.getEntities()) {
-            if (e instanceof LivingEntity) count++;
+        for (Entity entity : chunk.getEntities()) {
+            if (entity instanceof LivingEntity) count++;
         }
         return count;
     }
@@ -75,14 +121,17 @@ public class AutoChunkScanTask extends BukkitRunnable {
         return count;
     }
 
-    private void alertNearbyPlayers(Chunk chunk, int mobs, int hoppers, int chests, int furnaces) {
-        String msg = MessageManager.getPrefix() +
-                "&cLag warning in chunk [" + chunk.getX() + "," + chunk.getZ() + "]&7: " +
-                "&e" + mobs + " mobs&7, " +
-                "&e" + hoppers + " hoppers&7, " +
-                "&e" + chests + " chests&7, " +
-                "&e" + furnaces + " furnaces&7.";
+    private int countHopperMinecarts(Chunk chunk) {
+        int count = 0;
+        for (Entity entity : chunk.getEntities()) {
+            if (entity instanceof org.bukkit.entity.minecart.HopperMinecart) {
+                count++;
+            }
+        }
+        return count;
+    }
 
+    private void broadcastToNearbyPlayers(Chunk chunk, String msg) {
         chunk.getWorld().getPlayers().forEach(player -> {
             if (player.getLocation().getChunk().equals(chunk)) {
                 player.sendMessage(msg);
@@ -90,16 +139,26 @@ public class AutoChunkScanTask extends BukkitRunnable {
         });
     }
 
-    /**
-     * Fires the public ChunkOverloadEvent for API consumers.
-     * Cancels handling if another plugin cancels it.
-     */
     private void fireChunkOverloadEvent(Chunk chunk, String cause) {
         ChunkOverloadEvent event = new ChunkOverloadEvent(chunk, cause);
         Bukkit.getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return; // External plugin cancelled the event
-        }
-        // Internal handling can be added here later
+        if (event.isCancelled()) return;
+    }
+
+    private String getFriendlyName(Material material) {
+        return switch (material) {
+            case HOPPER -> "Hoppers";
+            case CHEST -> "Chests";
+            case FURNACE -> "Furnaces";
+            case BLAST_FURNACE -> "Blast Furnaces";
+            case SHULKER_BOX -> "Shulker Boxes";
+            case DROPPER -> "Droppers";
+            case DISPENSER -> "Dispensers";
+            case OBSERVER -> "Observers";
+            case BARREL -> "Barrels";
+            case PISTON -> "Pistons";
+            case TNT -> "TNT Blocks";
+            default -> material.name();
+        };
     }
 }
