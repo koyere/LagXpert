@@ -5,20 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35de2fee-0892-40b4-9e08-a9836878f6a5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/ClearItemsCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dependency-reduced-pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/dependency-reduced-pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/metrics/MetricsHandler.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/system/AbyssTracker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/AbyssCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/AbyssCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/ChunkStatusCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/ChunkStatusCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/ClearItemsCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/ClearItemsCommand.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/LagXpertCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/LagXpertCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/system/AbyssManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/system/AbyssManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/AutoChunkScanTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/AutoChunkScanTask.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/ConfigManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/ConfigManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/itemcleaner.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/itemcleaner.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/MessageManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/MessageManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/config.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/config.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/messages.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/messages.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/plugin.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/plugin.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/storage.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/storage.yml" afterDir="false" />
@@ -31,10 +30,10 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 6
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
   <component name="ProjectId" id="2wgUOx119mPCZdkRdBmbWMGmZYS" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
@@ -43,15 +42,15 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="35de2fee-0892-40b4-9e08-a9836878f6a5" name="Changes" comment="" />

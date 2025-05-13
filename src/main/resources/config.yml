@@ -11,3 +11,7 @@ modules:
 # 🛡 Permissions & control
 permissions:
   bypass-enabled: true
+
+# 🧠 Debug mode (shows extra console logs for diagnostics)
+debug: false
+

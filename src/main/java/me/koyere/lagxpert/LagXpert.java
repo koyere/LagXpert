@@ -2,6 +2,7 @@ package me.koyere.lagxpert;
 
 import me.koyere.lagxpert.commands.*;
 import me.koyere.lagxpert.listeners.*;
+import me.koyere.lagxpert.metrics.MetricsHandler;
 import me.koyere.lagxpert.system.AbyssManager;
 import me.koyere.lagxpert.tasks.AutoChunkScanTask;
 import me.koyere.lagxpert.tasks.ItemCleanerTask;
@@ -49,7 +50,7 @@ public class LagXpert extends JavaPlugin {
         // 🔄 Load config and messages
         ConfigManager.loadAll();
         MessageManager.loadMessages();
-        AbyssManager.loadConfig(); // ✅ Carga configuración y asegura existencia de /data/abyss
+        AbyssManager.loadConfig(); // ✅ Load abyss system
 
         // ──────────────────────────────────────────────
         // 🧭 Register commands
@@ -58,7 +59,7 @@ public class LagXpert extends JavaPlugin {
         getCommand("lagxpert").setTabCompleter(new LagXpertCommand());
         getCommand("chunkstatus").setExecutor(new ChunkStatusCommand());
         getCommand("abyss").setExecutor(new AbyssCommand());
-        getCommand("clearitems").setExecutor(new ClearItemsCommand()); // ✅ Comando manual de limpieza
+        getCommand("clearitems").setExecutor(new ClearItemsCommand());
 
         // ──────────────────────────────────────────────
         // 🧩 Register listeners by module activation
@@ -95,9 +96,10 @@ public class LagXpert extends JavaPlugin {
             new ItemCleanerTask().runTaskTimer(this, ticks, ticks);
         }
 
-        // 📊 Initialize bStats metrics
+        // 📊 Initialize bStats + custom metrics
         int pluginId = 25746;
         new Metrics(this, pluginId);
+        MetricsHandler.init(this); // ✅ Load extended charts
 
         getLogger().info("LagXpert Free enabled.");
     }

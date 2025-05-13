@@ -8,9 +8,9 @@
 enabled: true
 
 limits:
-  chests-per-chunk: 20       # Regular chests
-  hoppers-per-chunk: 8       # Hoppers
-  furnaces-per-chunk: 10     # Standard furnaces
+  chests-per-chunk: 20             # Regular chests
+  hoppers-per-chunk: 8             # Hoppers
+  furnaces-per-chunk: 10           # Standard furnaces
 
   blast_furnaces-per-chunk: 6      # Blast furnaces
   droppers-per-chunk: 10           # Droppers
@@ -21,3 +21,5 @@ limits:
   hopper_minecarts-per-chunk: 4    # Hopper minecarts (optional)
   pistons-per-chunk: 12            # Pistons (sticky or normal)
   tnt-per-chunk: 6                 # TNT blocks (optional)
+
+  barrels-per-chunk: 10            # 🆕 Barrels (included in detection and limits)

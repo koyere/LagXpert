@@ -1,11 +1,29 @@
-# LagXpert Free - Customizable Messages File
+# ──────────────────────────────────────────────
+#  🔷 LagXpert Free - Customizable Messages File
+# ──────────────────────────────────────────────
 
-# 🔷 Prefix used in all plugin messages
+# Prefix used in all plugin messages
 prefix: "&7[&bLagXpert&7] "
 
 # 📊 Chunk load status
 chunkload:
-  info: "&aChunk usage: &e{entities} mobs&7, &e{hoppers} hoppers&7, &e{chests} chests&7."
+  info: |
+    &8&m--------------------------------------------------
+    &b&lChunk Status &8| &7You are in chunk &e[{x}, {z}]
+    &f• &aMobs: &e{entities}
+    &f• &aHoppers: &e{hoppers}
+    &f• &aChests: &e{chests}
+    &f• &aFurnaces: &e{furnaces}
+    &f• &aBlast Furnaces: &e{blast_furnaces}
+    &f• &aDroppers: &e{droppers}
+    &f• &aDispensers: &e{dispensers}
+    &f• &aObservers: &e{observers}
+    &f• &aShulker Boxes: &e{shulker_boxes}
+    &f• &aHopper Minecarts: &e{hopper_minecarts}
+    &f• &aPistons: &e{pistons}
+    &f• &aTNT: &e{tnt}
+    &f• &aBarrels: &e{barrels}
+    &8&m--------------------------------------------------
   limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks."
 
 # 🔍 Inspect command messages
@@ -18,7 +36,7 @@ general:
   no-permission: "&cYou don't have permission to use this command."
   invalid-command: "&cUnknown subcommand. Use /lagxpert <chunkload|inspect|reload|help>."
 
-# 🚫 Limit-related warnings
+# 🚫 Limit-related warnings (used in listeners)
 limits:
   hopper: "&cHopper limit reached in this chunk."
   chest: "&cChest limit reached in this chunk."
@@ -31,9 +49,9 @@ limits:
 reload:
   success: "&aConfiguration and messages reloaded successfully."
 
-# 📘 Help menu (optional override for /lagxpert help)
+# 📘 Help menu (used in /lagxpert help)
 help:
-  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.1 &8- &fHelp Menu"
+  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.2 &8- &fHelp Menu"
   inspect: " &e/lagxpert inspect <x,z> &8- &7Inspect chunk info"
   chunkstatus: " &e/chunkstatus &8- &7Show current chunk usage"
   abyss: " &e/abyss &8- &7Recover recently cleared items"
@@ -46,3 +64,7 @@ clearitems:
   start: "&aManual cleanup started..."
   removed: "&e{count} &fground item(s) removed."
   broadcast: "&bLagXpert: &7Admin manually triggered item cleanup. &e{count} &7items removed."
+  world-start: "&aCleanup started for world: &f{world}"
+  world-broadcast: "&bLagXpert: &7Item cleanup in &f{world} &7removed &e{count} &7items."
+  invalid: "&cInvalid world or subcommand. Use &e/clearitems [all|<world>]"
+  no-world: "&cWorld not found: &f{world}"

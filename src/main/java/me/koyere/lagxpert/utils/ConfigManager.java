@@ -22,10 +22,9 @@ public class ConfigManager {
     private static int maxDroppersPerChunk;
     private static int maxDispensersPerChunk;
     private static int maxObserversPerChunk;
-    private static int maxHopperMinecartsPerChunk;
+    private static int maxBarrelsPerChunk;
     private static int maxPistonsPerChunk;
     private static int maxTntPerChunk;
-    private static int maxBarrelsPerChunk;
 
     // === MOB LIMIT ===
     private static int maxMobsPerChunk;
@@ -34,7 +33,7 @@ public class ConfigManager {
     private static int redstoneActiveTicks;
     private static boolean redstoneControlEnabled;
 
-    // === GLOBAL MODULE TOGGLES ===
+    // === MODULE TOGGLES ===
     private static boolean alertsEnabled;
     private static boolean mobsModuleEnabled;
     private static boolean storageModuleEnabled;
@@ -42,6 +41,9 @@ public class ConfigManager {
 
     // === TASK CONFIG ===
     private static int scanIntervalTicks;
+
+    // === GENERAL OPTIONS ===
+    private static boolean debugEnabled;
 
     /**
      * Loads all modular config files and general control values.
@@ -60,18 +62,17 @@ public class ConfigManager {
         maxMobsPerChunk = mobs.getInt("limits.mobs-per-chunk", 40);
 
         // === STORAGE LIMITS ===
-        maxHoppersPerChunk         = storage.getInt("limits.hoppers-per-chunk", 8);
-        maxChestsPerChunk          = storage.getInt("limits.chests-per-chunk", 20);
-        maxFurnacesPerChunk        = storage.getInt("limits.furnaces-per-chunk", 10);
-        maxBlastFurnacesPerChunk   = storage.getInt("limits.blast_furnaces-per-chunk", 6);
-        maxShulkerBoxesPerChunk    = storage.getInt("limits.shulker_boxes-per-chunk", 10);
-        maxDroppersPerChunk        = storage.getInt("limits.droppers-per-chunk", 10);
-        maxDispensersPerChunk      = storage.getInt("limits.dispensers-per-chunk", 10);
-        maxObserversPerChunk       = storage.getInt("limits.observers-per-chunk", 10);
-        maxHopperMinecartsPerChunk = storage.getInt("limits.hopper_minecarts-per-chunk", 4);
-        maxPistonsPerChunk         = storage.getInt("limits.pistons-per-chunk", 12);
-        maxTntPerChunk             = storage.getInt("limits.tnt-per-chunk", 6);
-        maxBarrelsPerChunk         = storage.getInt("limits.barrels-per-chunk", 10);
+        maxHoppersPerChunk = storage.getInt("limits.hoppers-per-chunk", 8);
+        maxChestsPerChunk = storage.getInt("limits.chests-per-chunk", 20);
+        maxFurnacesPerChunk = storage.getInt("limits.furnaces-per-chunk", 10);
+        maxBlastFurnacesPerChunk = storage.getInt("limits.blast_furnaces-per-chunk", 6);
+        maxShulkerBoxesPerChunk = storage.getInt("limits.shulker_boxes-per-chunk", 5);
+        maxDroppersPerChunk = storage.getInt("limits.droppers-per-chunk", 10);
+        maxDispensersPerChunk = storage.getInt("limits.dispensers-per-chunk", 10);
+        maxObserversPerChunk = storage.getInt("limits.observers-per-chunk", 10);
+        maxBarrelsPerChunk = storage.getInt("limits.barrels-per-chunk", 10);
+        maxPistonsPerChunk = storage.getInt("limits.pistons-per-chunk", 12);
+        maxTntPerChunk = storage.getInt("limits.tnt-per-chunk", 6);
 
         // === REDSTONE CONTROL ===
         redstoneActiveTicks = redstone.getInt("control.redstone-active-ticks", 100);
@@ -85,90 +86,35 @@ public class ConfigManager {
         mobsModuleEnabled = main.getBoolean("modules.mobs", true);
         storageModuleEnabled = main.getBoolean("modules.storage", true);
         taskModuleEnabled = main.getBoolean("modules.task", true);
+
+        // === GENERAL OPTIONS ===
+        debugEnabled = main.getBoolean("debug", false);
     }
 
     // === LIMIT GETTERS ===
-    public static int getMaxMobsPerChunk() {
-        return maxMobsPerChunk;
-    }
+    public static int getMaxMobsPerChunk() { return maxMobsPerChunk; }
+    public static int getMaxHoppersPerChunk() { return maxHoppersPerChunk; }
+    public static int getMaxChestsPerChunk() { return maxChestsPerChunk; }
+    public static int getMaxFurnacesPerChunk() { return maxFurnacesPerChunk; }
+    public static int getMaxBlastFurnacesPerChunk() { return maxBlastFurnacesPerChunk; }
+    public static int getMaxShulkerBoxesPerChunk() { return maxShulkerBoxesPerChunk; }
+    public static int getMaxDroppersPerChunk() { return maxDroppersPerChunk; }
+    public static int getMaxDispensersPerChunk() { return maxDispensersPerChunk; }
+    public static int getMaxObserversPerChunk() { return maxObserversPerChunk; }
+    public static int getMaxBarrelsPerChunk() { return maxBarrelsPerChunk; }
+    public static int getMaxPistonsPerChunk() { return maxPistonsPerChunk; }
+    public static int getMaxTntPerChunk() { return maxTntPerChunk; }
 
-    public static int getMaxHoppersPerChunk() {
-        return maxHoppersPerChunk;
-    }
-
-    public static int getMaxChestsPerChunk() {
-        return maxChestsPerChunk;
-    }
-
-    public static int getMaxFurnacesPerChunk() {
-        return maxFurnacesPerChunk;
-    }
-
-    public static int getMaxBlastFurnacesPerChunk() {
-        return maxBlastFurnacesPerChunk;
-    }
-
-    public static int getMaxShulkerBoxesPerChunk() {
-        return maxShulkerBoxesPerChunk;
-    }
-
-    public static int getMaxDroppersPerChunk() {
-        return maxDroppersPerChunk;
-    }
-
-    public static int getMaxDispensersPerChunk() {
-        return maxDispensersPerChunk;
-    }
-
-    public static int getMaxObserversPerChunk() {
-        return maxObserversPerChunk;
-    }
-
-    public static int getMaxHopperMinecartsPerChunk() {
-        return maxHopperMinecartsPerChunk;
-    }
-
-    public static int getMaxPistonsPerChunk() {
-        return maxPistonsPerChunk;
-    }
-
-    public static int getMaxTntPerChunk() {
-        return maxTntPerChunk;
-    }
-
-    public static int getMaxBarrelsPerChunk() {
-        return maxBarrelsPerChunk;
-    }
-
-    // === REDSTONE ===
-    public static int getRedstoneActiveTicks() {
-        return redstoneActiveTicks;
-    }
-
-    // === TASK ===
-    public static int getScanIntervalTicks() {
-        return scanIntervalTicks;
-    }
+    // === TASK CONFIG ===
+    public static int getScanIntervalTicks() { return scanIntervalTicks; }
 
     // === MODULE TOGGLES ===
-    public static boolean areAlertsEnabled() {
-        return alertsEnabled;
-    }
+    public static boolean areAlertsEnabled() { return alertsEnabled; }
+    public static boolean isRedstoneControlEnabled() { return redstoneControlEnabled; }
+    public static boolean isMobsModuleEnabled() { return mobsModuleEnabled; }
+    public static boolean isStorageModuleEnabled() { return storageModuleEnabled; }
+    public static boolean isTaskModuleEnabled() { return taskModuleEnabled; }
 
-    public static boolean isRedstoneControlEnabled() {
-        return redstoneControlEnabled;
-    }
-
-    public static boolean isMobsModuleEnabled() {
-        return mobsModuleEnabled;
-    }
-
-    public static boolean isStorageModuleEnabled() {
-        return storageModuleEnabled;
-    }
-
-    public static boolean isTaskModuleEnabled() {
-        return taskModuleEnabled;
-    }
+    // === DEBUG MODE ===
+    public static boolean isDebugEnabled() { return debugEnabled; }
 }
-

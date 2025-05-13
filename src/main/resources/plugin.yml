@@ -1,12 +1,12 @@
 # ──────────────────────────────────────────────
 #  ✅ LagXpert - Plugin Metadata & Definitions
 #  Developed by Koyere
-#  Version: 1.1.0
+#  Version: 1.2
 # ──────────────────────────────────────────────
 
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 1.1
+version: 1.2
 api-version: 1.16
 
 # 🌐 Plugin Information
@@ -40,7 +40,7 @@ commands:
   # 🧹 Manual cleanup of ground items
   clearitems:
     description: Manually trigger ground item cleanup
-    usage: /clearitems
+    usage: /clearitems [all|<world>]
     permission: lagxpert.clearitems
 
 # ──────────────────────────────────────────────
@@ -66,6 +66,14 @@ permissions:
   # 🧹 Manual execution of item cleanup
   lagxpert.clearitems:
     description: Allows manual execution of ground item cleanup
+    default: op
+
+  lagxpert.clearitems.all:
+    description: Allows using /clearitems all
+    default: op
+
+  lagxpert.clearitems.world:
+    description: Allows using /clearitems <world>
     default: op
 
   # ⛔ Bypass permissions per module

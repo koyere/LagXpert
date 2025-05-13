@@ -17,8 +17,8 @@ import java.util.Set;
 
 /**
  * Periodically removes dropped items from the ground to reduce lag.
- * Excludes specific item types and supports per-world filtering.
- * Sends broadcast messages and integrates Abyss persistent recovery system.
+ * Supports exclusions and per-world filtering.
+ * Integrates with Abyss recovery system.
  */
 public class ItemCleanerTask extends BukkitRunnable {
 
@@ -43,13 +43,9 @@ public class ItemCleanerTask extends BukkitRunnable {
         warningMessage = config.getString("warning.message", "&e[LagXpert] &7Items will be cleared in &c{seconds}&7s.");
     }
 
-    /**
-     * Executes the automatic cleanup task.
-     */
     @Override
     public void run() {
         int totalRemoved = runCleanupInternal(null);
-
         if (totalRemoved > 0) {
             String msg = ChatColor.translateAlternateColorCodes('&',
                     "&a[LagXpert] &fCleared &e" + totalRemoved + " &fground item(s).");
@@ -57,42 +53,56 @@ public class ItemCleanerTask extends BukkitRunnable {
         }
     }
 
-    /**
-     * Core cleanup logic, optionally associating cleared items to a player for recovery.
-     *
-     * @param actor The player responsible (used when triggered manually), or null if automatic
-     * @return number of removed items
-     */
     private int runCleanupInternal(Player actor) {
         int totalRemoved = 0;
 
         for (World world : Bukkit.getWorlds()) {
             if (!enabledWorlds.contains(world.getName())) continue;
-
-            for (Item item : world.getEntitiesByClass(Item.class)) {
-                ItemStack stack = item.getItemStack();
-                if (stack == null || excludedItems.contains(stack.getType().name())) continue;
-
-                // 🔁 Register in Abyss system (persistent version)
-                if (actor != null) {
-                    AbyssManager.add(actor, stack);
-                } else if (item.getThrower() != null) {
-                    Player thrower = Bukkit.getPlayer(item.getThrower());
-                    if (thrower != null) {
-                        AbyssManager.add(thrower, stack);
-                    }
-                }
-
-                item.remove();
-                totalRemoved++;
-            }
+            totalRemoved += clearItemsFromWorld(world, actor);
         }
 
         return totalRemoved;
     }
 
+    private int clearItemsFromWorld(World world, Player actor) {
+        int removed = 0;
+
+        for (Item item : world.getEntitiesByClass(Item.class)) {
+            ItemStack stack = item.getItemStack();
+            if (stack == null || excludedItems.contains(stack.getType().name())) continue;
+
+            if (actor != null) {
+                AbyssManager.add(actor, stack);
+            } else if (item.getThrower() != null) {
+                AbyssManager.add(item);
+            }
+
+            item.remove();
+            removed++;
+        }
+
+        return removed;
+    }
+
     /**
-     * Public method to schedule a broadcast warning before cleanup.
+     * Triggers cleanup manually with player context (for /clearitems).
+     */
+    public static int runManualCleanup(Player actor) {
+        ItemCleanerTask task = new ItemCleanerTask();
+        return task.runCleanupInternal(actor);
+    }
+
+    /**
+     * 🔹 Public method to trigger cleanup of a specific world.
+     */
+    public static int runWorldCleanup(World world) {
+        if (world == null) return 0;
+        ItemCleanerTask task = new ItemCleanerTask();
+        return task.clearItemsFromWorld(world, null);
+    }
+
+    /**
+     * Schedules a broadcast warning before cleanup.
      */
     public static void scheduleWarning() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "itemcleaner.yml");
@@ -114,16 +124,5 @@ public class ItemCleanerTask extends BukkitRunnable {
                 Bukkit.broadcastMessage(coloredMsg);
             }
         }.runTaskLater(LagXpert.getInstance(), delay);
-    }
-
-    /**
-     * Triggers cleanup manually with player context (for /clearitems).
-     *
-     * @param actor The player triggering the cleanup
-     * @return number of removed items
-     */
-    public static int runManualCleanup(Player actor) {
-        ItemCleanerTask task = new ItemCleanerTask();
-        return task.runCleanupInternal(actor);
     }
 }
