@@ -1,31 +1,94 @@
-# LagXpert - ItemCleaner Configuration
+# LagXpert - Item Cleaner and Abyss System Configuration
+# -----------------------------------------------------------------------------
+# This file configures the automatic ground item clearing task and the Abyss
+# item recovery system.
+#
+# IMPORTANT: The entire Item Cleaner module (which includes the Abyss system)
+# must first be enabled via 'modules.item-cleaner: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
 
-# ♻️ Enables automatic item clearing from the ground to reduce lag.
-enabled: true
+item-cleaner:
+  # Settings for the automatic ground item clearing task.
 
-# ⏲️ Interval (in ticks) between each cleanup run.
-# ⚠️ Warning: DO NOT set below 600 ticks (30s), may cause lag or server overload.
-interval-ticks: 6000
+  # Interval (in server ticks) between each automatic cleanup run.
+  # 1 second = 20 ticks. For example, 6000 ticks = 5 minutes.
+  # WARNING: Setting this value too low (e.g., below 600 ticks / 30 seconds)
+  # can potentially impact server performance, especially on busy servers.
+  interval-ticks: 6000
 
-# 🌍 Worlds where item cleaning is active
-enabled-worlds:
-  - world
-  - world_nether
-  - world_the_end
+  # Initial delay (in server ticks) before the first automatic cleanup run
+  # occurs after the server starts or the plugin is enabled/reloaded.
+  # If not specified, it often defaults to 'interval-ticks'.
+  initial-delay-ticks: 6000
 
-# 🚫 Item types to exclude from removal
-excluded-items: []
+  # Specify which worlds the automatic item cleaner should operate in.
+  # - To enable for all worlds, add "all" (lowercase) to the list.
+  # - To specify particular worlds, list their names exactly.
+  # Example for specific worlds:
+  # enabled-worlds:
+  #   - "world"
+  #   - "world_nether"
+  # Example for all worlds:
+  # enabled-worlds:
+  #   - "all"
+  enabled-worlds:
+    - "world"
+    - "world_nether"
+    - "world_the_end"
+    # - "all" # Uncomment and remove specific worlds above to enable for all worlds.
 
-# ⚠️ Warning message broadcasted X seconds before cleanup
-warning:
-  enabled: true
-  seconds-before: 10
-  message: "&e[LagXpert] &7Ground items will be cleared in &c{seconds}&7 seconds!"
+  # List of item material names (from Bukkit's Material enum, e.g., DIAMOND_SWORD)
+  # that should be EXCLUDED from automatic removal. These items will be ignored by the cleaner.
+  # Comparisons are case-insensitive.
+  # Example:
+  # excluded-items:
+  #   - "DIAMOND_PICKAXE"
+  #   - "NETHERITE_SWORD"
+  excluded-items: []
 
-# 🕳 Abyss system: allows players to recover cleared items for a limited time
+  warning:
+    # Enable or disable the broadcast warning message before items are automatically cleared.
+    enabled: true
+
+    # How many seconds before the actual cleanup the warning message should be broadcast.
+    time-seconds: 10
+
+  messages:
+    # Message broadcast to all players to warn about impending item cleanup.
+    # Placeholder: {seconds} - will be replaced with the value from 'time-seconds' above.
+    warning: "&e[LagXpert] &7Ground items will be cleared in &c{seconds}&7 seconds!"
+
+    # Message broadcast after items have been automatically cleared by the task.
+    # Placeholder: {count} - will be replaced with the number of items cleared.
+    cleaned: "&a[LagXpert] &fCleared &e{count}&f ground item(s)."
+
+# Abyss Item Recovery System
+# Allows players to recover items that were cleared by the ItemCleanerTask or
+# through manual /clearitems commands, for a limited duration.
 abyss:
+  # Enable or disable the Abyss system.
+  # Note: The Abyss system will only function if this is true AND the main
+  # 'item-cleaner' module (in config.yml) is also enabled.
   enabled: true
-  retention-seconds: 120           # Time items remain in the abyss (in seconds)
-  max-items-per-player: 30         # Max stored items per player
-  recover-message: "&aYou recovered &f{count} &aitem(s) from the abyss."
-  empty-message: "&7You have no items to recover."
+
+  # Duration (in seconds) for which cleared items are kept in the abyss
+  # before being permanently deleted and becoming unrecoverable.
+  retention-seconds: 120
+
+  # Maximum number of individual item stacks that can be stored in the abyss per player.
+  # When this limit is reached for a player, the oldest items in their abyss
+  # are removed to make space for newly cleared items.
+  max-items-per-player: 30
+
+  messages:
+    # Message sent to a player when they successfully recover items from their abyss.
+    # Placeholder: {count} - number of item stacks recovered.
+    recover: "&aYou recovered &f{count} &aitem(s) from the abyss."
+
+    # Message sent to a player if their abyss is empty or all stored items have expired.
+    empty: "&7You have no items to recover from the abyss."
+
+    # Message sent to a player if item recovery was only partial because their inventory was full.
+    # Some items might have been dropped on the ground in this case.
+    recover-fail-full-inv: "&cYour inventory was full! Some recovered items may have been dropped on the ground."

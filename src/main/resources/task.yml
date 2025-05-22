@@ -1,7 +1,14 @@
 # LagXpert - Scheduled Tasks Configuration
 
-# ⏱ Controls how frequently the plugin checks all loaded chunks to detect overloads.
-# The interval is in ticks (20 ticks = 1 second).
+# ⏱ Controls how frequently the AutoChunkScanTask checks loaded chunks to detect overloads.
+# The interval is in server ticks (20 ticks = 1 second).
+#
+# IMPORTANT: This task will only run if the 'auto-chunk-scan' module is enabled
+# in the main 'config.yml' file (modules.auto-chunk-scan: true).
 
 task:
-  scan-interval-ticks: 600   # Delay between automatic scans of all loaded chunks
+  # Delay in ticks between each automatic scan of loaded chunks near players.
+  # Default: 600 ticks = 30 seconds.
+  # Setting this too low on very large servers with many players could potentially
+  # increase server load, although the task itself has been optimized.
+  scan-interval-ticks: 600

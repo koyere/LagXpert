@@ -9,7 +9,7 @@ import org.bukkit.entity.Player;
 
 /**
  * Command that allows players to recover their recently cleared items
- * from the Abyss system, if enabled and within retention period.
+ * from the Abyss system, if the system is enabled and items are within the retention period.
  * Usage: /abyss
  * Permission: lagxpert.abyss
  */
@@ -18,19 +18,25 @@ public class AbyssCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
-        // ✅ Ensure command is used by a player
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("[LagXpert] This command can only be used by players.");
+        // Check if the command sender is a player
+        // Reverted from pattern matching for Java 11 compatibility
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("general.players-only"));
             return true;
         }
+        Player player = (Player) sender; // Explicit cast after instanceof check
 
-        // 🔐 Permission check
+        // Check if the player has the required permission
         if (!player.hasPermission("lagxpert.abyss")) {
-            player.sendMessage(MessageManager.getPrefix() + MessageManager.get("general.no-permission"));
+            player.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
             return true;
         }
 
-        // 🔄 Recover items from player's abyss file
+        // No arguments are expected for this command.
+        // Further argument handling can be added here if needed in the future.
+
+        // Attempt to recover items from the player's abyss file
+        // All user feedback messages (success, empty, errors) are handled by AbyssManager.tryRecover()
         AbyssManager.tryRecover(player);
         return true;
     }

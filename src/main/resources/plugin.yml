@@ -1,98 +1,136 @@
-# ──────────────────────────────────────────────
-#  ✅ LagXpert - Plugin Metadata & Definitions
-#  Developed by Koyere
-#  Version: 1.2
-# ──────────────────────────────────────────────
-
+# ----------------------------------------------
+#  Plugin Metadata & Definitions for LagXpert
+# ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 1.2
-api-version: 1.16
-
-# 🌐 Plugin Information
-description: Monitor and control lag sources like chunk loads, redstone, entities and storage blocks.
+version: 1.3
+api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
+description: Monitors and controls server lag sources such as chunk limits, redstone, entities, and storage blocks.
 author: Koyere
+authors: [Koyere]
 website: https://www.spigotmc.org/resources/lagxpert-free.124725/
 
-# ──────────────────────────────────────────────
-# ⚙️ Commands
-# ──────────────────────────────────────────────
+# Optional: Soft dependencies - plugin will load without them but integrates if present.
+# softdepend:
+#  - PlaceholderAPI
+
+# ----------------------------------------------
+#  Commands
+# ----------------------------------------------
 commands:
-
-  # 🎛 Main command
   lagxpert:
-    description: Main command for LagXpert plugin
-    usage: /lagxpert <chunkload|inspect|reload|help>
+    description: Main command for LagXpert. Accesses subcommands and help.
+    usage: "/lagxpert <help|reload|inspect|chunkload>"
+    aliases: [lx, lagx]
     permission: lagxpert.use
+    permission-message: "You do not have permission to use this command."
 
-  # 🧩 Player-friendly chunk usage status
   chunkstatus:
-    description: Shows current chunk usage to players
-    usage: /chunkstatus
-    permission: lagxpert.use
+    description: Displays usage information for the player's current chunk.
+    usage: "/chunkstatus"
+    aliases: [cs]
+    permission: lagxpert.chunkstatus
+    permission-message: "You do not have permission to view chunk status."
 
-  # 🕳 Recover items recently cleared from the ground
   abyss:
-    description: Recover recently cleared items from the ground
-    usage: /abyss
+    description: Allows recovery of recently cleared items from the Abyss system.
+    usage: "/abyss"
     permission: lagxpert.abyss
+    permission-message: "You do not have permission to use the Abyss."
 
-  # 🧹 Manual cleanup of ground items
   clearitems:
-    description: Manually trigger ground item cleanup
-    usage: /clearitems [all|<world>]
+    description: Manually clears dropped items from the ground.
+    usage: "/clearitems [all | <world_name>]"
+    aliases: [ci, cleanitems]
     permission: lagxpert.clearitems
+    permission-message: "You do not have permission to clear items."
 
-# ──────────────────────────────────────────────
-# 🔐 Permissions
-# ──────────────────────────────────────────────
+# ----------------------------------------------
+#  Permissions
+# ----------------------------------------------
 permissions:
-
-  # 🔓 General access to /lagxpert and /chunkstatus
   lagxpert.use:
-    description: Allows basic usage of LagXpert commands
+    description: Grants basic usage of the /lagxpert command (e.g., /lagxpert help).
     default: true
-
-  # 🛠 Admin-level commands (inspect, reload, bypass limits)
+  lagxpert.chunkstatus:
+    description: Allows usage of the /chunkstatus command.
+    default: true
   lagxpert.admin:
-    description: Allows access to administrative inspection and reload
+    description: Grants access to LagXpert administrative commands (reload, inspect).
     default: op
-
-  # 🕳 Recovery system via /abyss
   lagxpert.abyss:
-    description: Allows players to recover their cleared items using /abyss
+    description: Allows players to use /abyss to recover cleared items.
     default: true
-
-  # 🧹 Manual execution of item cleanup
   lagxpert.clearitems:
-    description: Allows manual execution of ground item cleanup
+    description: Grants basic usage of the /clearitems command.
     default: op
-
   lagxpert.clearitems.all:
-    description: Allows using /clearitems all
+    description: Allows using /clearitems all.
     default: op
-
   lagxpert.clearitems.world:
-    description: Allows using /clearitems <world>
+    description: Allows using /clearitems <world_name>.
     default: op
 
-  # ⛔ Bypass permissions per module
+  # Bypass Permissions Node - grants all specific bypass permissions if given.
+  lagxpert.bypass.*:
+    description: Grants bypass to all LagXpert limitations. Use with caution.
+    default: false
+    children:
+      lagxpert.bypass.mobs: true
+      lagxpert.bypass.redstone: true
+      lagxpert.bypass.hoppers: true
+      lagxpert.bypass.chests: true
+      lagxpert.bypass.furnaces: true
+      lagxpert.bypass.blast_furnaces: true
+      lagxpert.bypass.smokers: true
+      lagxpert.bypass.barrels: true
+      lagxpert.bypass.droppers: true
+      lagxpert.bypass.dispensers: true
+      lagxpert.bypass.shulker_boxes: true
+      lagxpert.bypass.tnt: true
+      lagxpert.bypass.pistons: true
+      lagxpert.bypass.observers: true
+
+  # Individual Bypass Permissions
   lagxpert.bypass.mobs:
-    description: Exempts the player from mob spawn limits
+    description: Exempts from mob spawn limits.
     default: false
-
-  lagxpert.bypass.hoppers:
-    description: Exempts the player from hopper placement limits
-    default: false
-
-  lagxpert.bypass.chests:
-    description: Exempts the player from chest placement limits
-    default: false
-
-  lagxpert.bypass.furnaces:
-    description: Exempts the player from furnace placement limits
-    default: false
-
   lagxpert.bypass.redstone:
-    description: Exempts the player from redstone limitation actions
+    description: Exempts from redstone control actions.
+    default: false
+  lagxpert.bypass.hoppers:
+    description: Exempts from hopper placement limits.
+    default: false
+  lagxpert.bypass.chests:
+    description: Exempts from chest (and trapped chest) placement limits.
+    default: false
+  lagxpert.bypass.furnaces:
+    description: Exempts from furnace placement limits.
+    default: false
+  lagxpert.bypass.blast_furnaces:
+    description: Exempts from blast furnace placement limits.
+    default: false
+  lagxpert.bypass.smokers:
+    description: Exempts from smoker placement limits.
+    default: false
+  lagxpert.bypass.barrels:
+    description: Exempts from barrel placement limits.
+    default: false
+  lagxpert.bypass.droppers:
+    description: Exempts from dropper placement limits.
+    default: false
+  lagxpert.bypass.dispensers:
+    description: Exempts from dispenser placement limits.
+    default: false
+  lagxpert.bypass.shulker_boxes:
+    description: Exempts from shulker box placement limits.
+    default: false
+  lagxpert.bypass.tnt:
+    description: Exempts from TNT placement limits.
+    default: false
+  lagxpert.bypass.pistons:
+    description: Exempts from piston (and sticky piston) placement limits.
+    default: false
+  lagxpert.bypass.observers:
+    description: Exempts from observer placement limits.
     default: false

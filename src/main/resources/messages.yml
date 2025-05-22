@@ -1,70 +1,83 @@
 # ──────────────────────────────────────────────
 #  🔷 LagXpert Free - Customizable Messages File
 # ──────────────────────────────────────────────
+# Here you can translate and customize all messages LagXpert shows to users.
+# - Use '&' for color codes (e.g., &a for light green, &c for light red).
+# - Placeholders like {placeholder_name} will be replaced with dynamic values by the plugin.
+# ──────────────────────────────────────────────
 
-# Prefix used in all plugin messages
+# Prefix used in most plugin messages.
 prefix: "&7[&bLagXpert&7] "
 
-# 📊 Chunk load status
-chunkload:
-  info: |
-    &8&m--------------------------------------------------
-    &b&lChunk Status &8| &7You are in chunk &e[{x}, {z}]
-    &f• &aMobs: &e{entities}
-    &f• &aHoppers: &e{hoppers}
-    &f• &aChests: &e{chests}
-    &f• &aFurnaces: &e{furnaces}
-    &f• &aBlast Furnaces: &e{blast_furnaces}
-    &f• &aDroppers: &e{droppers}
-    &f• &aDispensers: &e{dispensers}
-    &f• &aObservers: &e{observers}
-    &f• &aShulker Boxes: &e{shulker_boxes}
-    &f• &aHopper Minecarts: &e{hopper_minecarts}
-    &f• &aPistons: &e{pistons}
-    &f• &aTNT: &e{tnt}
-    &f• &aBarrels: &e{barrels}
-    &8&m--------------------------------------------------
-  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks."
-
-# 🔍 Inspect command messages
-inspect:
-  no-permission: "&cYou do not have permission to inspect chunks."
-  usage: "&eUse: /lagxpert inspect <chunkX,chunkZ>"
-
-# ⚠️ General command feedback
+# == General Plugin and Command Messages ==
 general:
   no-permission: "&cYou don't have permission to use this command."
-  invalid-command: "&cUnknown subcommand. Use /lagxpert <chunkload|inspect|reload|help>."
+  players-only: "&cThis command can only be used by players."
+  invalid-command: "&cUnknown subcommand. Use &e/lagxpert help &cfor available commands."
+  command-not-implemented: "&eThis feature is not yet implemented."
+  config-reloaded: "&aLagXpert configuration has been reloaded successfully!"
+  error-occurred: "&cAn error occurred. Please check the console."
 
-# 🚫 Limit-related warnings (used in listeners)
-limits:
-  hopper: "&cHopper limit reached in this chunk."
-  chest: "&cChest limit reached in this chunk."
-  furnace: "&cFurnace limit reached in this chunk."
-  mobs: "&cMob spawn limit reached in this chunk."
-  redstone: "&cRedstone component forcibly disabled (lag prevention)."
-  near-limit: "&e[!] This chunk is nearing its limit: &f{used}&7/&f{max}"
-
-# 🔄 Reload feedback
-reload:
-  success: "&aConfiguration and messages reloaded successfully."
-
-# 📘 Help menu (used in /lagxpert help)
+# == /lagxpert Command & Help Menu (/lagxpert help) ==
 help:
-  header: "&8&m------------------------------------------\n&b&lLagXpert &7v1.2 &8- &fHelp Menu"
-  inspect: " &e/lagxpert inspect <x,z> &8- &7Inspect chunk info"
-  chunkstatus: " &e/chunkstatus &8- &7Show current chunk usage"
-  abyss: " &e/abyss &8- &7Recover recently cleared items"
-  reload: " &e/lagxpert reload &8- &7Reload all config files"
-  clearitems: " &e/clearitems &8- &7Manually clear dropped items"
-  footer: "&8&m------------------------------------------"
+  inspect: " &e/lagxpert inspect <x> <z> [world] &8- &7Inspect a specific chunk."
+  chunkstatus: " &e/chunkstatus &8- &7Show info about your current chunk."
+  abyss: " &e/abyss &8- &7Recover recently cleared items."
+  reload: " &e/lagxpert reload &8- &7Reload all configuration files."
+  clearitems: " &e/clearitems [all|world] &8- &7Manually clear dropped items."
 
-# 🧹 Clearitems command
+# == /lagxpert inspect Command ==
+inspect:
+  usage: "&eUsage: /lagxpert inspect <x> <z> [optional_world_name]"
+  invalid-coords: "&cInvalid coordinates. X and Z must be numbers."
+  world-not-found: "&cWorld '{world_name}' not found."
+  chunk-not-loaded: "&cChunk [{chunk_x},{chunk_z}] in '{world_name}' is not loaded."
+  header: "&6Inspecting Chunk &e[{chunk_x},{chunk_z}] &6in world &e{world_name}"
+  line:
+    entities: "&7Living Entities: &e{entities}"
+    hoppers: "&7Hoppers: &e{hoppers}"
+    chests: "&7Chests (Chests/Trapped): &e{chests}"
+    furnaces: "&7Furnaces (Furnace/Blast/Smoker): &e{furnaces}"
+    shulker_boxes: "&7Shulker Boxes: &e{shulker_boxes}"
+    barrels: "&7Barrels: &e{barrels}"
+    dispensers_droppers: "&7Dispensers/Droppers: &e{dispensers_droppers}"
+
+# == /chunkstatus Command ==
+chunkstatus:
+  info: "&aChunk Information: Mobs: {entities}, Hoppers: {hoppers}..." # Key currently unused by ChunkStatusCommand
+  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks." # Key currently unused by ChunkStatusCommand
+
+# == /clearitems Command ==
 clearitems:
-  start: "&aManual cleanup started..."
-  removed: "&e{count} &fground item(s) removed."
-  broadcast: "&bLagXpert: &7Admin manually triggered item cleanup. &e{count} &7items removed."
-  world-start: "&aCleanup started for world: &f{world}"
-  world-broadcast: "&bLagXpert: &7Item cleanup in &f{world} &7removed &e{count} &7items."
-  invalid: "&cInvalid world or subcommand. Use &e/clearitems [all|<world>]"
-  no-world: "&cWorld not found: &f{world}"
+  world-not-found: "&cWorld '{world}' not found."
+  removed-sender: "&aYou have cleared &e{count} &aitem(s) from &f{world_or_all}&a."
+  broadcast: "&7[&cItemClear&7] &e{player} &7cleared &c{count} &7item(s) from &f{world_or_all}&7."
+  usage: "&cInvalid command. Usage: &e/clearitems [all | <world_name>]"
+
+# == Limit Alerts (Used by Listeners and Tasks) ==
+# CORRECTED: Keys are now singular to match StorageListener.java expectations.
+limits:
+  mobs: "&cMob limit reached in this chunk!"
+  hopper: "&cHopper limit reached in this chunk!" # Singular key
+  chest: "&cChest limit reached in this chunk!" # Singular key (covers trapped too)
+  furnace: "&cFurnace limit reached in this chunk!" # Singular key
+  blast_furnace: "&cBlast furnace limit reached in this chunk!" # Singular key
+  smoker: "&cSmoker limit reached in this chunk!" # Singular key
+  barrel: "&cBarrel limit reached in this chunk!" # Singular key
+  dropper: "&cDropper limit reached in this chunk!" # Singular key
+  dispenser: "&cDispenser limit reached in this chunk!" # Singular key
+  shulker_box: "&cShulker box limit reached in this chunk!" # Singular key
+  tnt: "&cTNT limit reached in this chunk!" # Singular key
+  piston: "&cPiston limit reached in this chunk!" # Singular key (covers sticky too)
+  observer: "&cObserver limit reached in this chunk!" # Singular key
+  redstone: "&cRedstone component forcibly disabled (lag prevention)."
+  near-limit: "&e[!] Warning: Chunk is nearing its limit for &f{type}&e (&f{used}&7/&f{max}&e)." # Placeholder {type}
+
+# == AutoChunkScanTask Messages ==
+alerts:
+  chunk-scan:
+    overloaded-summary: "&cChunk [{chunk_x},{chunk_z}] in world '{world}' is overloaded: &e{details}"
+
+# == /lagxpert chunkload Redirect Message ==
+chunkload:
+  use-chunkstatus-command: "&ePlease use the standalone command: &b/chunkstatus &eto view chunk information."

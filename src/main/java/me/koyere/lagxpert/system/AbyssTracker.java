@@ -1,45 +1,61 @@
 package me.koyere.lagxpert.system;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
- * Tracks item removal and recovery stats for bStats metrics.
- * Data is polled and reset on each report.
+ * Tracks item removal and recovery statistics related to the Abyss system
+ * for bStats metrics. Data is intended to be polled and reset periodically.
+ * Uses AtomicInteger to ensure thread-safe operations on counters.
  */
 public class AbyssTracker {
 
-    private static int removedItems = 0;
-    private static int recoveredItems = 0;
+    // Using AtomicInteger for thread-safe counting operations.
+    private static final AtomicInteger itemsAddedToAbyss = new AtomicInteger(0);
+    private static final AtomicInteger itemsRecoveredFromAbyss = new AtomicInteger(0);
 
     /**
-     * Adds to the counter of removed ground items.
-     * @param count Number of items removed
+     * Increments the counter for items added to the Abyss system.
+     * This method is thread-safe.
+     *
+     * @param count The number of items added to the Abyss.
      */
-    public static void addRemoved(int count) {
-        removedItems += count;
+    public static void itemAddedToAbyss(int count) {
+        if (count > 0) {
+            itemsAddedToAbyss.addAndGet(count);
+        }
     }
 
     /**
-     * Adds to the counter of recovered items from Abyss.
-     * @param count Number of items recovered
+     * Increments the counter for items successfully recovered from the Abyss by players.
+     * This method is thread-safe.
+     *
+     * @param count The number of items recovered from the Abyss.
      */
-    public static void addRecovered(int count) {
-        recoveredItems += count;
+    public static void itemRecoveredFromAbyss(int count) {
+        if (count > 0) {
+            itemsRecoveredFromAbyss.addAndGet(count);
+        }
     }
 
     /**
-     * Returns the removed item count and resets the counter.
+     * Retrieves the current count of items added to the Abyss since the last poll
+     * and then resets this counter to zero.
+     * This method is thread-safe.
+     *
+     * @return The number of items added to the Abyss since the last call.
      */
-    public static int pollRemoved() {
-        int temp = removedItems;
-        removedItems = 0;
-        return temp;
+    public static int pollItemsAddedToAbyss() {
+        return itemsAddedToAbyss.getAndSet(0);
     }
 
     /**
-     * Returns the recovered item count and resets the counter.
+     * Retrieves the current count of items recovered from the Abyss since the last poll
+     * and then resets this counter to zero.
+     * This method is thread-safe.
+     *
+     * @return The number of items recovered from the Abyss since the last call.
      */
-    public static int pollRecovered() {
-        int temp = recoveredItems;
-        recoveredItems = 0;
-        return temp;
+    public static int pollItemsRecoveredFromAbyss() {
+        return itemsRecoveredFromAbyss.getAndSet(0);
     }
 }

@@ -1,17 +1,44 @@
 # LagXpert - General Configuration
+# This is the main configuration file for LagXpert.
+# Use this file to enable or disable core functionalities and set global options.
 
-# 🧩 Modules activation
+# 🧩 Modules Activation
+# Activate or deactivate main plugin functionalities.
+# If a module is set to false, its specific listeners, tasks, and configurations
+# in other files (e.g., mobs.yml, redstone.yml, itemcleaner.yml)
+# will generally be disabled or ignored.
 modules:
+  # Enables mob limiting features.
+  # Checks against limits defined in 'mobs.yml'.
   mobs: true
+
+  # Enables storage block limiting features (e.g., hoppers, chests).
+  # Checks against limits defined in 'storage.yml'.
   storage: true
+
+  # Enables redstone control features (e.g., limiting persistently active redstone).
+  # Uses settings from 'redstone.yml'.
   redstone: true
+
+  # Enables the alert system for players and console.
+  # Alert messages and specific alert toggles are in 'alerts.yml'.
+  # Note: Individual alert messages can also be disabled in 'alerts.yml'.
   alerts: true
-  task: true
 
-# 🛡 Permissions & control
-permissions:
-  bypass-enabled: true
+  # Enables the automatic periodic scanning of loaded chunks for over-limit elements.
+  # Scan interval and other task-specific settings are in 'task.yml'.
+  auto-chunk-scan: true # Renamed from 'task' for clarity
 
-# 🧠 Debug mode (shows extra console logs for diagnostics)
+  # Enables the automatic item cleaner task and the associated Abyss item recovery system.
+  # Detailed settings for cleaning interval, worlds, excluded items, and Abyss
+  # are in 'itemcleaner.yml'.
+  item-cleaner: true # Includes Abyss system toggle implicitly or explicitly via itemcleaner.yml
+
+# 🧠 Debug Mode
+# If true, LagXpert will output additional information to the server console,
+# which can be helpful for diagnosing issues or understanding plugin behavior.
+# It's recommended to keep this false during normal operation.
 debug: false
 
+# Removed 'permissions.bypass-enabled' as it was not implemented.
+# Bypass functionality is handled by individual Bukkit permissions (e.g., lagxpert.bypass.mobs).

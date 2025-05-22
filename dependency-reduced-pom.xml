@@ -4,7 +4,7 @@
   <groupId>me.koyere</groupId>
   <artifactId>LagXpert</artifactId>
   <name>LagXpert</name>
-  <version>1.1</version>
+  <version>1.2</version>
   <description>Free plugin to control lag sources on Minecraft servers</description>
   <url>https://github.com/koyere/LagXpert</url>
   <build>

@@ -1,8 +1,23 @@
 # LagXpert - Redstone Control Configuration
-
-# ⚡ Prevents redstone wires and devices from staying active for too long,
-# which can cause excessive lag if abused.
+# -----------------------------------------------------------------------------
+# Configures the behavior of the redstone control system.
+# This system aims to prevent lag caused by redstone mechanisms that remain
+# active for excessively long periods or update too rapidly (future consideration).
+#
+# IMPORTANT: The entire redstone control module must first be enabled via
+# 'modules.redstone: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
 
 control:
-  enabled: true                # Enable redstone overload detection
-  redstone-active-ticks: 100   # Max duration (in ticks) a redstone wire may remain powered
+  # Maximum duration (in server ticks) that a redstone wire (Material.REDSTONE_WIRE)
+  # may remain continuously powered before LagXpert intervenes (e.g., by cutting the wire).
+  # 1 second = 20 ticks. Default: 100 ticks = 5 seconds.
+  # Set to 0 or a negative value to disable this specific duration check,
+  # though RedstoneListener's scheduleRedstoneCheck already handles delayTicks <= 0.
+  redstone-active-ticks: 100
+
+  # Future considerations for this file (not yet implemented in current code):
+  # - Whitelisted redstone components (e.g., allow specific clocks).
+  # - Different tick limits for different redstone components (e.g., pistons, comparators).
+  # - Control over rapid pulsing/clock detection.

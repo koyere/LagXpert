@@ -1,25 +1,37 @@
-# ──────────────────────────────────────────────
-#  📦 LagXpert - Storage Limits Configuration
-# ──────────────────────────────────────────────
-# These limits control how many storage-related blocks
-# can be placed per chunk. When exceeded, warnings
-# or restrictions may apply (if configured).
-
-enabled: true
+# LagXpert - Storage and Block Limits Configuration
+# -----------------------------------------------------------------------------
+# This file defines the maximum number of certain storage-related or
+# potentially lag-intensive blocks allowed per chunk.
+#
+# When these limits are exceeded during block placement (by StorageListener)
+# or detected by a chunk scan (by AutoChunkScanTask), warnings may be issued
+# or actions may be taken, based on plugin configuration and permissions.
+#
+# IMPORTANT: The entire storage limiting module must first be enabled via
+# 'modules.storage: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
 
 limits:
-  chests-per-chunk: 20             # Regular chests
-  hoppers-per-chunk: 8             # Hoppers
-  furnaces-per-chunk: 10           # Standard furnaces
+  # Standard Storage Blocks
+  chests-per-chunk: 20             # Limit for regular Chests and Trapped Chests combined.
+  hoppers-per-chunk: 8             # Limit for Hoppers.
+  furnaces-per-chunk: 10           # Limit for standard Furnaces.
+  blast_furnaces-per-chunk: 6      # Limit for Blast Furnaces.
+  smokers-per-chunk: 6             # Limit for Smokers. (Ensure ConfigManager loads this)
+  barrels-per-chunk: 10            # Limit for Barrels.
+  shulker_boxes-per-chunk: 5       # Limit for all types of Shulker Boxes.
 
-  blast_furnaces-per-chunk: 6      # Blast furnaces
-  droppers-per-chunk: 10           # Droppers
-  dispensers-per-chunk: 10         # Dispensers
-  observers-per-chunk: 10          # Observers
-  shulker_boxes-per-chunk: 5       # Shulker boxes
+  # Redstone Components & Other Utility Blocks
+  droppers-per-chunk: 10           # Limit for Droppers.
+  dispensers-per-chunk: 10         # Limit for Dispensers.
+  observers-per-chunk: 10          # Limit for Observers.
+  pistons-per-chunk: 12            # Limit for Pistons (both regular and sticky).
+  tnt-per-chunk: 6                 # Limit for TNT blocks.
 
-  hopper_minecarts-per-chunk: 4    # Hopper minecarts (optional)
-  pistons-per-chunk: 12            # Pistons (sticky or normal)
-  tnt-per-chunk: 6                 # TNT blocks (optional)
-
-  barrels-per-chunk: 10            # 🆕 Barrels (included in detection and limits)
+    # Entities (Optional - Current implementation might not check this on block placement)
+    # hopper_minecarts-per-chunk: 4    # Limit for Hopper Minecarts (entities).
+    # Note: Limiting entities like minecarts per chunk would typically be
+    # handled by EntityListener or AutoChunkScanTask, not StorageListener (which is for blocks).
+    # This key is not actively used by ConfigManager in the last reviewed version.
+  # Implementation for this limit would need to be added to the Java code.

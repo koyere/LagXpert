@@ -10,22 +10,24 @@ import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import java.io.File;
 
 /**
  * Main class for the LagXpert plugin.
- * Handles registration of commands, listeners, configuration, metrics, and scheduled tasks.
+ * Handles the initialization and deinitialization of plugin components,
+ * including configuration, commands, listeners, tasks, and metrics.
  */
 public class LagXpert extends JavaPlugin {
 
     private static LagXpert instance;
+    private static final int BSTATS_PLUGIN_ID = 25746; // bStats Plugin ID for metrics.
+    private Metrics bStatsInstance; // Store the bStats Metrics instance
 
     /**
      * Returns the static instance of this plugin.
+     * Provides a global access point to the plugin instance.
+     *
+     * @return The singleton instance of LagXpert.
      */
     public static LagXpert getInstance() {
         return instance;
@@ -35,10 +37,30 @@ public class LagXpert extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
-        // ──────────────────────────────────────────────
-        // 📂 Save default configuration files (if missing)
-        // ──────────────────────────────────────────────
-        saveDefaultConfig();
+        saveDefaultConfigurations();
+        loadPluginLogic();
+        registerCommandsAndListeners();
+        schedulePluginTasks();
+        initializeMetrics(); // Initialize bStats and custom charts
+
+        getLogger().info("LagXpert Free enabled successfully.");
+    }
+
+    @Override
+    public void onDisable() {
+        // Cancel all tasks registered by this plugin to prevent potential errors
+        // or continued execution after the plugin is disabled.
+        Bukkit.getScheduler().cancelTasks(this);
+
+        getLogger().info("LagXpert Free disabled.");
+    }
+
+    /**
+     * Saves all default configuration files from the JAR to the plugin's data folder
+     * if they do not already exist. This ensures users have the default configs on first run.
+     */
+    private void saveDefaultConfigurations() {
+        saveDefaultConfig(); // Saves config.yml
         saveResource("mobs.yml", false);
         saveResource("storage.yml", false);
         saveResource("redstone.yml", false);
@@ -46,25 +68,32 @@ public class LagXpert extends JavaPlugin {
         saveResource("task.yml", false);
         saveResource("messages.yml", false);
         saveResource("itemcleaner.yml", false);
+    }
 
-        // 🔄 Load config and messages
+    /**
+     * Loads essential plugin data and configurations into memory.
+     * ConfigManager.loadAll() is responsible for loading all YAML files
+     * and initializing other managers like MessageManager with their respective configs.
+     */
+    private void loadPluginLogic() {
         ConfigManager.loadAll();
-        MessageManager.loadMessages();
-        AbyssManager.loadConfig(); // ✅ Load abyss system
+        AbyssManager.loadConfig(); // AbyssManager fetches its config from ConfigManager values
+    }
 
-        // ──────────────────────────────────────────────
-        // 🧭 Register commands
-        // ──────────────────────────────────────────────
+    /**
+     * Registers all plugin commands and their executors/tab completers.
+     * Also registers event listeners, conditionally based on module activation
+     * status retrieved from ConfigManager.
+     */
+    private void registerCommandsAndListeners() {
         getCommand("lagxpert").setExecutor(new LagXpertCommand());
         getCommand("lagxpert").setTabCompleter(new LagXpertCommand());
         getCommand("chunkstatus").setExecutor(new ChunkStatusCommand());
         getCommand("abyss").setExecutor(new AbyssCommand());
         getCommand("clearitems").setExecutor(new ClearItemsCommand());
+        getCommand("clearitems").setTabCompleter(new ClearItemsCommand()); // Assuming ClearItemsCommand also implements TabCompleter
 
-        // ──────────────────────────────────────────────
-        // 🧩 Register listeners by module activation
-        // ──────────────────────────────────────────────
-        if (ConfigManager.isRedstoneControlEnabled()) {
+        if (ConfigManager.isRedstoneControlModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new RedstoneListener(), this);
         }
         if (ConfigManager.isStorageModuleEnabled()) {
@@ -73,49 +102,34 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isMobsModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new EntityListener(), this);
         }
-
-        // ──────────────────────────────────────────────
-        // 🔁 Start chunk scanning task (if enabled)
-        // ──────────────────────────────────────────────
-        if (ConfigManager.isTaskModuleEnabled()) {
-            long interval = ConfigManager.getScanIntervalTicks();
-            new AutoChunkScanTask().runTaskTimer(this, 100L, interval);
-        }
-
-        // 🧹 Start item cleaner task (if enabled)
-        File itemCleanerFile = new File(getDataFolder(), "itemcleaner.yml");
-        FileConfiguration itemCleanerConfig = loadYaml(itemCleanerFile);
-
-        if (itemCleanerConfig.getBoolean("enabled", true)) {
-            int ticks = itemCleanerConfig.getInt("interval-ticks", 6000);
-
-            if (itemCleanerConfig.getBoolean("warning.enabled", true)) {
-                ItemCleanerTask.scheduleWarning();
-            }
-
-            new ItemCleanerTask().runTaskTimer(this, ticks, ticks);
-        }
-
-        // 📊 Initialize bStats + custom metrics
-        int pluginId = 25746;
-        new Metrics(this, pluginId);
-        MetricsHandler.init(this); // ✅ Load extended charts
-
-        getLogger().info("LagXpert Free enabled.");
-    }
-
-    @Override
-    public void onDisable() {
-        getLogger().info("LagXpert Free disabled.");
     }
 
     /**
-     * Utility method to load a YAML file from disk.
-     *
-     * @param file YAML file to load
-     * @return parsed FileConfiguration
+     * Schedules all recurring tasks for the plugin.
+     * Tasks like chunk scanning and item cleaning are started if enabled in the configuration.
      */
-    public static FileConfiguration loadYaml(File file) {
-        return YamlConfiguration.loadConfiguration(file);
+    private void schedulePluginTasks() {
+        // Schedule automatic chunk scanning task
+        if (ConfigManager.isAutoChunkScanModuleEnabled()) { // CORRECTED: Was isAutoChunkScanTaskModuleEnabled
+            long scanInterval = ConfigManager.getScanIntervalTicks();
+            new AutoChunkScanTask().runTaskTimer(this, 100L, scanInterval);
+        }
+
+        // Schedule automatic item cleaner task
+        if (ConfigManager.isItemCleanerModuleEnabled()) { // CORRECTED: Was isItemCleanerEnabled
+            int cleanerInterval = ConfigManager.getItemCleanerIntervalTicks();
+            long initialDelay = ConfigManager.getItemCleanerInitialDelayTicks();
+            new ItemCleanerTask().runTaskTimer(this, initialDelay, cleanerInterval);
+        }
+    }
+
+    /**
+     * Initializes bStats metrics collection for the plugin.
+     * Creates the Metrics instance once and passes it to MetricsHandler
+     * for the registration of custom charts.
+     */
+    private void initializeMetrics() {
+        this.bStatsInstance = new Metrics(this, BSTATS_PLUGIN_ID);
+        MetricsHandler.init(this.bStatsInstance);
     }
 }
