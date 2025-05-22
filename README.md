@@ -2,7 +2,7 @@
 
 **LagXpert Free** is a modular and performance-oriented plugin designed to monitor and mitigate lag sources in Minecraft servers, with a focus on **chunk-based optimization** and **player education**.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.3-blue)
 ![bStats](https://img.shields.io/badge/bStats-enabled-brightgreen)
 
 ---
