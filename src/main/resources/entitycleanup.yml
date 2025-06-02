@@ -1,0 +1,123 @@
+# LagXpert - Entity Cleanup Configuration
+# -----------------------------------------------------------------------------
+# This file configures the automatic entity cleanup task that removes
+# problematic entities to improve server performance.
+#
+# IMPORTANT: The entire Entity Cleanup module must first be enabled via
+# 'modules.entity-cleanup: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
+
+entity-cleanup:
+  # Interval (in server ticks) between each automatic cleanup run.
+  # 1 second = 20 ticks. For example, 6000 ticks = 5 minutes.
+  # WARNING: Setting this value too low (e.g., below 1200 ticks / 1 minute)
+  # can potentially impact server performance, especially on busy servers.
+  interval-ticks: 6000
+
+  # Initial delay (in server ticks) before the first automatic cleanup run
+  # occurs after the server starts or the plugin is enabled/reloaded.
+  initial-delay-ticks: 6000
+
+  # Specify which worlds the entity cleanup should operate in.
+  # - To enable for all worlds, add "all" (lowercase) to the list.
+  # - To specify particular worlds, list their names exactly.
+  # Example for specific worlds:
+  # enabled-worlds:
+  #   - "world"
+  #   - "world_nether"
+  # Example for all worlds:
+  # enabled-worlds:
+  #   - "all"
+  enabled-worlds:
+    - "world"
+    - "world_nether"
+    - "world_the_end"
+    # - "all" # Uncomment and remove specific worlds above to enable for all worlds.
+
+  # Cleanup target configuration
+  cleanup-targets:
+    # Remove invalid/corrupted entities (entities with invalid data)
+    invalid-entities: true
+
+    # Remove duplicate entities in the same location
+    duplicate-entities: true
+
+    # Remove entities outside world borders
+    out-of-bounds-entities: true
+
+    # Remove abandoned vehicles (boats, minecarts without passengers for extended time)
+    abandoned-vehicles: true
+
+    # Remove empty item frames (item frames without items)
+    empty-item-frames: false
+
+    # Remove empty armor stands (armor stands without any equipment)
+    empty-armor-stands: false
+
+  # Advanced cleanup settings
+  advanced:
+    # Maximum entities per chunk before triggering aggressive cleanup
+    max-entities-per-chunk: 200
+
+    # Radius (in blocks) to check for duplicate entities
+    duplicate-detection-radius: 1.0
+
+    # Time (in seconds) a vehicle must be abandoned before removal
+    abandoned-vehicle-timeout-seconds: 300
+
+    # Skip entities with custom names (usually important)
+    skip-named-entities: true
+
+    # Skip tamed animals
+    skip-tamed-animals: true
+
+    # Skip entities that are leashed
+    skip-leashed-entities: true
+
+  # Exclusion lists
+  exclusions:
+    # Entity types that should never be removed (even if they meet removal criteria)
+    # Use Bukkit EntityType names (e.g., VILLAGER, IRON_GOLEM, ENDER_DRAGON)
+    protected-entity-types:
+      - "VILLAGER"
+      - "IRON_GOLEM"
+      - "ENDER_DRAGON"
+      - "WITHER"
+      - "PLAYER"
+
+    # Worlds where entity cleanup should never run (overrides enabled-worlds)
+    blacklisted-worlds: []
+
+  messages:
+    # Message broadcast when entity cleanup completes (if enabled)
+    cleanup-complete: "&a[LagXpert] Entity cleanup completed. Removed &e{count}&a problematic entities."
+
+    # Whether to broadcast cleanup completion messages
+    broadcast-completion: false
+
+    # Only broadcast if more than this number of entities were removed
+    broadcast-threshold: 10
+
+# Performance and safety settings
+performance:
+  # Maximum number of entities to process per cleanup cycle
+  # This prevents the cleanup from taking too long on servers with many entities
+  max-entities-per-cycle: 5000
+
+  # If true, entity cleanup will be spread across multiple ticks to reduce lag
+  spread-across-ticks: true
+
+  # Number of entities to process per tick when spreading is enabled
+  entities-per-tick: 100
+
+# Debug and monitoring
+debug:
+  # Log detailed information about entity cleanup operations
+  detailed-logging: false
+
+  # Log statistics after each cleanup cycle
+  log-statistics: true
+
+  # Include entity locations in debug logs (can be verbose)
+  include-locations: false

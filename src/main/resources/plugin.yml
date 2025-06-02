@@ -3,7 +3,7 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 1.3
+version: 1.4
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
 description: Monitors and controls server lag sources such as chunk limits, redstone, entities, and storage blocks.
 author: Koyere
@@ -45,6 +45,13 @@ commands:
     permission: lagxpert.clearitems
     permission-message: "You do not have permission to clear items."
 
+  tps:
+    description: Displays server performance information including TPS, memory usage, and lag statistics.
+    usage: "/tps [summary|detailed|memory|chunks|lagspikes|history|reset]"
+    aliases: [lag, performance]
+    permission: lagxpert.tps
+    permission-message: "You do not have permission to view server performance."
+
 # ----------------------------------------------
 #  Permissions
 # ----------------------------------------------
@@ -69,6 +76,12 @@ permissions:
     default: op
   lagxpert.clearitems.world:
     description: Allows using /clearitems <world_name>.
+    default: op
+  lagxpert.tps:
+    description: Allows usage of the /tps command to view server performance.
+    default: true
+  lagxpert.monitoring.alerts:
+    description: Allows receiving monitoring alerts for performance issues.
     default: op
 
   # Bypass Permissions Node - grants all specific bypass permissions if given.

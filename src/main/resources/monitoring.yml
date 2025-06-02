@@ -1,0 +1,175 @@
+# LagXpert - Performance Monitoring Configuration
+# -----------------------------------------------------------------------------
+# This file configures the TPS monitoring system and performance tracking features.
+# Provides real-time server performance analysis, automatic lag detection,
+# and comprehensive performance history storage.
+#
+# IMPORTANT: The entire monitoring module must first be enabled via
+# 'modules.monitoring: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
+
+monitoring:
+  # TPS (Ticks Per Second) monitoring configuration
+  tps:
+    # Enable/disable TPS monitoring system
+    enabled: true
+
+    # Update interval for TPS calculations (in server ticks)
+    # Lower values provide more accurate real-time data but use more resources
+    # 1 second = 20 ticks. Recommended: 20-100 ticks
+    update-interval-ticks: 20
+
+    # TPS calculation windows (in seconds)
+    # These determine how TPS averages are calculated over different time periods
+    calculation-windows:
+      short-term: 60    # 1 minute average
+      medium-term: 300  # 5 minutes average
+      long-term: 900    # 15 minutes average
+
+    # Performance thresholds for automatic alerts
+    alert-thresholds:
+      # Critical TPS level (immediate alert)
+      critical: 15.0
+      # Warning TPS level (warning alert)
+      warning: 18.0
+      # Good TPS level (recovery notification)
+      good: 19.5
+
+    # TPS history storage
+    history:
+      # Enable/disable TPS history tracking
+      enabled: true
+      # Maximum number of TPS records to store
+      max-records: 8640  # 24 hours worth of data (assuming 10-second intervals)
+      # Interval between history snapshots (in seconds)
+      snapshot-interval-seconds: 10
+      # Enable automatic cleanup of old records
+      auto-cleanup: true
+
+  # Memory usage monitoring
+  memory:
+    # Enable/disable memory monitoring
+    enabled: true
+
+    # Memory alert thresholds (percentage of max heap)
+    alert-thresholds:
+      critical: 95.0  # Critical memory usage
+      warning: 85.0   # Warning memory usage
+      good: 70.0      # Good memory usage for recovery notifications
+
+    # Memory monitoring update interval (in seconds)
+    update-interval-seconds: 30
+
+    # Enable garbage collection monitoring
+    gc-monitoring: true
+
+  # Chunk loading/unloading statistics
+  chunks:
+    # Enable/disable chunk monitoring
+    enabled: true
+
+    # Track chunk loading/unloading events
+    track-events: true
+
+    # Alert when too many chunks are loaded simultaneously
+    max-loaded-chunks-warning: 5000
+
+    # Monitor chunk loading rate (chunks per minute)
+    loading-rate-monitoring: true
+    loading-rate-threshold: 100  # Alert if more than X chunks loaded per minute
+
+  # Lag spike detection
+  lag-detection:
+    # Enable/disable automatic lag spike detection
+    enabled: true
+
+    # Tick time threshold for lag spike detection (in milliseconds)
+    # Server tick should ideally be 50ms (20 TPS), anything above threshold is a lag spike
+    tick-threshold-ms: 100
+
+    # Minimum consecutive lag spikes to trigger an alert
+    consecutive-spikes-threshold: 3
+
+    # Maximum number of lag spikes to track
+    max-tracked-spikes: 100
+
+    # Auto-analyze lag spikes (attempt to identify causes)
+    auto-analyze: true
+
+# Alert system for monitoring
+alerts:
+  # Enable/disable monitoring alerts
+  enabled: true
+
+  # Alert delivery methods
+  delivery:
+    # Send alerts to console
+    console: true
+    # Send alerts to online players with permission
+    players: true
+    # Required permission for players to receive monitoring alerts
+    player-permission: "lagxpert.monitoring.alerts"
+
+  # Alert cooldown system (prevents spam)
+  cooldown:
+    # Cooldown for TPS alerts (in seconds)
+    tps-alerts: 60
+    # Cooldown for memory alerts (in seconds)
+    memory-alerts: 120
+    # Cooldown for lag spike alerts (in seconds)
+    lag-spike-alerts: 30
+
+  # Custom alert messages
+  messages:
+    tps-critical: "&c[Performance Alert] &fCritical TPS detected: &e{tps}&f. Server performance severely degraded!"
+    tps-warning: "&e[Performance Alert] &fLow TPS detected: &e{tps}&f. Server experiencing lag."
+    tps-recovery: "&a[Performance Alert] &fTPS recovered: &e{tps}&f. Server performance normalized."
+    memory-critical: "&c[Performance Alert] &fCritical memory usage: &e{usage}%&f. Server may run out of memory!"
+    memory-warning: "&e[Performance Alert] &fHigh memory usage: &e{usage}%&f. Consider restarting server."
+    memory-recovery: "&a[Performance Alert] &fMemory usage normalized: &e{usage}%&f."
+    lag-spike: "&c[Performance Alert] &fLag spike detected! Duration: &e{duration}ms&f. Tick time: &e{tick_time}ms&f."
+
+# Performance history and analytics
+analytics:
+  # Enable/disable performance analytics
+  enabled: true
+
+  # Automatic performance reports
+  reports:
+    # Enable automatic daily performance reports
+    daily-reports: true
+    # Time to send daily reports (24-hour format: HH:MM)
+    daily-report-time: "06:00"
+    # Enable automatic weekly performance summaries
+    weekly-summaries: true
+    # Day of week for weekly summaries (MONDAY, TUESDAY, etc.)
+    weekly-summary-day: "SUNDAY"
+
+  # Performance data export
+  export:
+    # Enable performance data export functionality
+    enabled: false
+    # Export format (JSON, CSV)
+    format: "JSON"
+    # Automatic export interval (in hours, 0 = disabled)
+    auto-export-interval-hours: 0
+    # Maximum export file size (in MB)
+    max-file-size-mb: 10
+
+# Debug and development settings
+debug:
+  # Enable detailed monitoring debug logs
+  detailed-logging: false
+
+  # Log TPS calculations to console
+  log-tps-calculations: false
+
+  # Log memory usage details
+  log-memory-details: false
+
+  # Include stack traces in lag spike analysis
+  include-stack-traces: false
+
+  # Performance impact logging (logs the monitoring system's own impact)
+  log-monitoring-performance: false

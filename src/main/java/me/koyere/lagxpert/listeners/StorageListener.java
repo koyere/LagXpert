@@ -2,7 +2,10 @@ package me.koyere.lagxpert.listeners;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
-import me.koyere.lagxpert.system.AlertCooldownManager; // IMPORT ADDED for Alert Cooldown
+import me.koyere.lagxpert.cache.ChunkDataCache;
+import me.koyere.lagxpert.system.AlertCooldownManager;
+import me.koyere.lagxpert.tasks.AsyncChunkAnalyzer;
+import me.koyere.lagxpert.utils.ChunkUtils;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -25,7 +28,7 @@ import java.util.function.Supplier;
  * Listens for block placements and restricts storage-related blocks
  * if their per-chunk limits are exceeded. Alerts players on placement
  * if limits are reached or nearly reached, subject to alert configurations and cooldowns.
- * Optimized to count Tile Entities efficiently where applicable.
+ * Now includes cache invalidation and async processing for improved performance.
  */
 public class StorageListener implements Listener {
 
@@ -92,7 +95,7 @@ public class StorageListener implements Listener {
         }
 
         Player player = event.getPlayer();
-        Block blockBeingPlaced = event.getBlock(); // Renamed for clarity vs. block in chunk
+        Block blockBeingPlaced = event.getBlock();
         Material type = blockBeingPlaced.getType();
         Chunk chunk = blockBeingPlaced.getChunk();
 
@@ -106,16 +109,13 @@ public class StorageListener implements Listener {
                                     chunk.getX() + "," + chunk.getZ() + " bypassed due to permission."
                     );
                 }
+                // Still invalidate cache even for bypass to keep data accurate
+                invalidateChunkCache(chunk);
                 return;
             }
 
-            int currentCount;
-            if (config.isTileEntity()) {
-                currentCount = countTileEntitiesInChunk(chunk, type);
-            } else {
-                currentCount = countAllBlocksOfTypeInChunk(chunk, type);
-            }
-
+            // Get current count using cache-optimized methods
+            int currentCount = getCurrentCount(chunk, config);
             int limit = config.getLimitSupplier().get();
             int newCount = currentCount + 1;
 
@@ -151,7 +151,88 @@ public class StorageListener implements Listener {
                         player.sendMessage(MessageManager.getPrefixedFormattedMessage(config.getNearLimitMessageKey(), placeholders));
                     }
                 }
+
+                // Block was placed successfully, invalidate cache
+                invalidateChunkCache(chunk);
+
+                // Optionally trigger async re-analysis of the chunk for future cache hits
+                scheduleAsyncReanalysis(chunk);
+            } else {
+                // Block was placed successfully, invalidate cache
+                invalidateChunkCache(chunk);
+
+                // Optionally trigger async re-analysis of the chunk for future cache hits
+                scheduleAsyncReanalysis(chunk);
             }
+        }
+    }
+
+    /**
+     * Gets the current count of a specific block type in a chunk using cache-optimized methods.
+     */
+    private int getCurrentCount(Chunk chunk, BlockLimitConfig config) {
+        // Check cache first for complete data
+        ChunkDataCache.ChunkData cachedData = ChunkDataCache.getCachedData(chunk);
+        if (cachedData != null && cachedData.isComplete()) {
+            // Use cached data for counting
+            switch (config.getOverloadCause()) {
+                case "chests":
+                    return cachedData.getCustomCount("all_chests");
+                case "shulker_boxes":
+                    return cachedData.getCustomCount("all_shulker_boxes");
+                case "pistons":
+                    return cachedData.getCustomCount("all_pistons");
+                default:
+                    return cachedData.getBlockCount(config.getMaterial());
+            }
+        }
+
+        // No cache available, use direct counting methods
+        if (config.isTileEntity()) {
+            if (config.getOverloadCause().equals("chests")) {
+                return ChunkUtils.countTileEntitiesInChunk(chunk, Material.CHEST) +
+                        ChunkUtils.countTileEntitiesInChunk(chunk, Material.TRAPPED_CHEST);
+            } else if (config.getOverloadCause().equals("shulker_boxes")) {
+                return ChunkUtils.countAllShulkerBoxesInChunk(chunk);
+            } else {
+                return ChunkUtils.countTileEntitiesInChunk(chunk, config.getMaterial());
+            }
+        } else {
+            if (config.getOverloadCause().equals("pistons")) {
+                return ChunkUtils.countAllBlocksOfTypeSlow(chunk, Material.PISTON) +
+                        ChunkUtils.countAllBlocksOfTypeSlow(chunk, Material.STICKY_PISTON);
+            } else {
+                return ChunkUtils.countAllBlocksOfTypeSlow(chunk, config.getMaterial());
+            }
+        }
+    }
+
+    /**
+     * Invalidates the cache for a chunk and schedules async re-analysis.
+     */
+    private void invalidateChunkCache(Chunk chunk) {
+        ChunkUtils.invalidateChunkCache(chunk);
+    }
+
+    /**
+     * Schedules asynchronous re-analysis of a chunk to populate cache for future use.
+     * This is done with low priority to avoid impacting server performance.
+     */
+    private void scheduleAsyncReanalysis(Chunk chunk) {
+        // Only schedule if the chunk is still loaded and we're not overwhelming the async system
+        if (chunk.isLoaded() && !AsyncChunkAnalyzer.isActive()) {
+            Bukkit.getScheduler().runTaskLater(LagXpert.getInstance(), () -> {
+                if (chunk.isLoaded()) {
+                    AsyncChunkAnalyzer.analyzeAndCache(chunk, result -> {
+                        if (ConfigManager.isDebugEnabled() && result.isSuccess()) {
+                            LagXpert.getInstance().getLogger().info(
+                                    "[StorageListener] Re-cached chunk " + chunk.getX() + "," + chunk.getZ() +
+                                            " after block placement in " + result.getAnalysisTimeMs() + "ms"
+                            );
+                        }
+                    });
+                }
+            }, 20L); // Wait 1 second before re-analyzing to allow for multiple block placements
         }
     }
 
@@ -166,13 +247,12 @@ public class StorageListener implements Listener {
             case BARREL: return ConfigManager.shouldAlertOnBarrelsLimitReached();
             case DROPPER: return ConfigManager.shouldAlertOnDroppersLimitReached();
             case DISPENSER: return ConfigManager.shouldAlertOnDispensersLimitReached();
-            // For SHULKER_BOX, we rely on the specific colored shulker material if defined, or general if used
             case TNT: return ConfigManager.shouldAlertOnTntLimitReached();
             case PISTON: case STICKY_PISTON: return ConfigManager.shouldAlertOnPistonsLimitReached();
             case OBSERVER: return ConfigManager.shouldAlertOnObserversLimitReached();
             default:
                 // If it's any shulker box, use the generic shulker box alert toggle
-                if (material.name().contains("SHULKER_BOX")) { // More robust check for all shulker types
+                if (material.name().contains("SHULKER_BOX")) {
                     return ConfigManager.shouldAlertOnShulkerBoxesLimitReached();
                 }
                 return true;
@@ -194,43 +274,11 @@ public class StorageListener implements Listener {
             case PISTON: case STICKY_PISTON: return ConfigManager.shouldWarnOnPistonsNearLimit();
             case OBSERVER: return ConfigManager.shouldWarnOnObserversNearLimit();
             default:
-                if (material.name().contains("SHULKER_BOX")) { // More robust check for all shulker types
+                if (material.name().contains("SHULKER_BOX")) {
                     return ConfigManager.shouldWarnOnShulkerBoxesNearLimit();
                 }
                 return true;
         }
-    }
-
-    private int countTileEntitiesInChunk(Chunk chunk, Material material) {
-        int count = 0;
-        if (material == null || chunk == null || !chunk.isLoaded()) return 0;
-        for (BlockState blockState : chunk.getTileEntities()) {
-            if (blockState.getType() == material) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private int countAllBlocksOfTypeInChunk(Chunk chunk, Material material) {
-        int count = 0;
-        if (material == null || chunk == null || !chunk.isLoaded()) return 0;
-        if (ConfigManager.isDebugEnabled() && LagXpert.getInstance() != null) {
-            LagXpert.getInstance().getLogger().info("[LagXpert] StorageListener: Performing slow block scan for " + material.name() +
-                    " in chunk " + chunk.getX() + "," + chunk.getZ());
-        }
-        int minHeight = chunk.getWorld().getMinHeight();
-        int maxHeight = chunk.getWorld().getMaxHeight();
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = minHeight; y < maxHeight; y++) {
-                    if (chunk.getBlock(x, y, z).getType() == material) {
-                        count++;
-                    }
-                }
-            }
-        }
-        return count;
     }
 
     private void fireChunkOverloadEvent(Chunk chunk, String cause) {

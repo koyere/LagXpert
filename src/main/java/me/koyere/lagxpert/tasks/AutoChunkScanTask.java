@@ -2,13 +2,15 @@ package me.koyere.lagxpert.tasks;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
-import me.koyere.lagxpert.system.AlertCooldownManager; // IMPORT ADDED for Alert Cooldown
+import me.koyere.lagxpert.cache.ChunkDataCache;
+import me.koyere.lagxpert.system.AlertCooldownManager;
+import me.koyere.lagxpert.utils.ChunkUtils;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
-import org.bukkit.Tag; // For Material Tags like SHULKER_BOXES
+import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
@@ -27,6 +29,7 @@ import java.util.function.Supplier;
  * exceeding configured limits (e.g., mobs, hoppers, chests).
  * It can fire ChunkOverloadEvents and send warnings (with cooldowns)
  * to players in affected chunks based on detailed alert configurations.
+ * Now uses cache system for improved performance.
  */
 public class AutoChunkScanTask extends BukkitRunnable {
 
@@ -63,7 +66,8 @@ public class AutoChunkScanTask extends BukkitRunnable {
     private enum CounterType {
         LIVING_ENTITY,
         TILE_ENTITY,
-        BLOCK_ITERATION
+        BLOCK_ITERATION,
+        CUSTOM_COUNT
     }
 
     private static final List<ScannableElement> elementsToScan = new ArrayList<>();
@@ -71,18 +75,18 @@ public class AutoChunkScanTask extends BukkitRunnable {
     static {
         elementsToScan.add(new ScannableElement("Mobs", ConfigManager::getMaxMobsPerChunk, "mobs", ConfigManager::shouldWarnOnMobsNearLimit));
         elementsToScan.add(new ScannableElement("Hoppers", Material.HOPPER, ConfigManager::getMaxHoppersPerChunk, "hoppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnHoppersNearLimit));
-        elementsToScan.add(new ScannableElement("Chests", Material.CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnChestsNearLimit));
-        elementsToScan.add(new ScannableElement("Trapped Chests", Material.TRAPPED_CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnChestsNearLimit));
+        elementsToScan.add(new ScannableElement("Chests", Material.CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
+        elementsToScan.add(new ScannableElement("Trapped Chests", Material.TRAPPED_CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
         elementsToScan.add(new ScannableElement("Furnaces", Material.FURNACE, ConfigManager::getMaxFurnacesPerChunk, "furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnFurnacesNearLimit));
         elementsToScan.add(new ScannableElement("Blast Furnaces", Material.BLAST_FURNACE, ConfigManager::getMaxBlastFurnacesPerChunk, "blast_furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBlastFurnacesNearLimit));
         elementsToScan.add(new ScannableElement("Smokers", Material.SMOKER, ConfigManager::getMaxSmokersPerChunk, "smokers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnSmokersNearLimit));
         elementsToScan.add(new ScannableElement("Barrels", Material.BARREL, ConfigManager::getMaxBarrelsPerChunk, "barrels", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBarrelsNearLimit));
         elementsToScan.add(new ScannableElement("Droppers", Material.DROPPER, ConfigManager::getMaxDroppersPerChunk, "droppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDroppersNearLimit));
         elementsToScan.add(new ScannableElement("Dispensers", Material.DISPENSER, ConfigManager::getMaxDispensersPerChunk, "dispensers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDispensersNearLimit));
-        elementsToScan.add(new ScannableElement("Shulker Boxes", Material.SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnShulkerBoxesNearLimit));
+        elementsToScan.add(new ScannableElement("Shulker Boxes", Material.SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnShulkerBoxesNearLimit));
         elementsToScan.add(new ScannableElement("TNT", Material.TNT, ConfigManager::getMaxTntPerChunk, "tnt", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnTntNearLimit));
-        elementsToScan.add(new ScannableElement("Pistons", Material.PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnPistonsNearLimit));
-        elementsToScan.add(new ScannableElement("Sticky Pistons", Material.STICKY_PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnPistonsNearLimit));
+        elementsToScan.add(new ScannableElement("Pistons", Material.PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
+        elementsToScan.add(new ScannableElement("Sticky Pistons", Material.STICKY_PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
         elementsToScan.add(new ScannableElement("Observers", Material.OBSERVER, ConfigManager::getMaxObserversPerChunk, "observers", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnObserversNearLimit));
     }
 
@@ -95,6 +99,10 @@ public class AutoChunkScanTask extends BukkitRunnable {
         if (ConfigManager.isDebugEnabled()) {
             LagXpert.getInstance().getLogger().info("[LagXpert] AutoChunkScanTask: Starting scan cycle...");
         }
+
+        long scanStartTime = System.currentTimeMillis();
+        int chunksScanned = 0;
+        int cacheHits = 0;
 
         for (World world : Bukkit.getWorlds()) {
             List<Player> playersInWorld = world.getPlayers();
@@ -113,33 +121,23 @@ public class AutoChunkScanTask extends BukkitRunnable {
                     continue;
                 }
 
+                chunksScanned++;
                 List<Player> playersInThisChunk = getPlayersInChunk(currentChunk);
                 boolean isChunkCurrentlyPopulatedByPlayers = !playersInThisChunk.isEmpty();
 
                 StringBuilder overloadedElementsSummary = new StringBuilder();
                 boolean chunkIsActuallyOverloaded = false;
 
-                for (ScannableElement element : elementsToScan) {
-                    int count;
-                    switch (element.getCounterType()) {
-                        case LIVING_ENTITY:
-                            count = countLivingEntities(currentChunk);
-                            break;
-                        case TILE_ENTITY:
-                            count = countTileEntitiesInChunk(currentChunk, element.getMaterial());
-                            break;
-                        case BLOCK_ITERATION:
-                            count = countAllBlocksOfTypeInChunk(currentChunk, element.getMaterial());
-                            break;
-                        default:
-                            count = 0;
-                            if (LagXpert.getInstance() != null) {
-                                LagXpert.getInstance().getLogger().warning("[LagXpert] AutoChunkScanTask: Unknown counter type: " + element.getCounterType());
-                            }
-                            break;
-                    }
+                // Use complete chunk analysis with cache
+                ChunkDataCache.ChunkData chunkData = ChunkUtils.performCompleteChunkAnalysis(currentChunk);
+                if (chunkData != null && chunkData.isComplete()) {
+                    cacheHits++;
+                }
 
+                for (ScannableElement element : elementsToScan) {
+                    int count = getElementCount(currentChunk, element, chunkData);
                     int limit = element.getLimitSupplier().get();
+
                     if (limit <= 0) continue;
 
                     if (count > limit) {
@@ -151,7 +149,7 @@ public class AutoChunkScanTask extends BukkitRunnable {
                         overloadedElementsSummary.append(count).append(" ").append(element.getDisplayName());
                     } else if (count >= (int) (limit * 0.8) && isChunkCurrentlyPopulatedByPlayers && limit > 0) {
                         if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldAutoScanTriggerIndividualNearLimitWarnings()) {
-                            sendNearLimitWarning(playersInThisChunk, element, count, limit, currentChunk); // Pass currentChunk
+                            sendNearLimitWarning(playersInThisChunk, element, count, limit, currentChunk);
                         }
                     }
                 }
@@ -177,8 +175,86 @@ public class AutoChunkScanTask extends BukkitRunnable {
                 }
             }
         }
+
+        long scanDuration = System.currentTimeMillis() - scanStartTime;
+
         if (ConfigManager.isDebugEnabled()) {
-            LagXpert.getInstance().getLogger().info("[LagXpert] AutoChunkScanTask: Scan cycle finished.");
+            double cacheHitRate = chunksScanned > 0 ? (double) cacheHits / chunksScanned * 100 : 0;
+            LagXpert.getInstance().getLogger().info("[LagXpert] AutoChunkScanTask: Scan cycle finished. " +
+                    "Chunks scanned: " + chunksScanned + ", Cache hits: " + cacheHits +
+                    " (" + String.format("%.1f", cacheHitRate) + "%), Duration: " + scanDuration + "ms");
+        }
+    }
+
+    /**
+     * Gets the count for a specific element using the most appropriate method.
+     * Uses cached data when available for maximum performance.
+     */
+    private int getElementCount(Chunk chunk, ScannableElement element, ChunkDataCache.ChunkData chunkData) {
+        switch (element.getCounterType()) {
+            case LIVING_ENTITY:
+                if (chunkData != null && chunkData.isComplete()) {
+                    return chunkData.getLivingEntities();
+                }
+                return countLivingEntities(chunk);
+
+            case TILE_ENTITY:
+                if (chunkData != null && chunkData.isComplete()) {
+                    return chunkData.getBlockCount(element.getMaterial());
+                }
+                return countTileEntitiesInChunk(chunk, element.getMaterial());
+
+            case BLOCK_ITERATION:
+                if (chunkData != null && chunkData.isComplete()) {
+                    return chunkData.getBlockCount(element.getMaterial());
+                }
+                return countAllBlocksOfTypeInChunk(chunk, element.getMaterial());
+
+            case CUSTOM_COUNT:
+                if (chunkData != null && chunkData.isComplete()) {
+                    return getCustomCount(chunkData, element);
+                }
+                return getCustomCountDirect(chunk, element);
+
+            default:
+                if (LagXpert.getInstance() != null) {
+                    LagXpert.getInstance().getLogger().warning("[LagXpert] AutoChunkScanTask: Unknown counter type: " + element.getCounterType());
+                }
+                return 0;
+        }
+    }
+
+    /**
+     * Gets custom counts from cached data based on element type.
+     */
+    private int getCustomCount(ChunkDataCache.ChunkData chunkData, ScannableElement element) {
+        switch (element.getOverloadCauseSuffix()) {
+            case "chests":
+                return chunkData.getCustomCount("all_chests");
+            case "shulker_boxes":
+                return chunkData.getCustomCount("all_shulker_boxes");
+            case "pistons":
+                return chunkData.getCustomCount("all_pistons");
+            default:
+                return chunkData.getBlockCount(element.getMaterial());
+        }
+    }
+
+    /**
+     * Gets custom counts directly from chunk when cache is not available.
+     */
+    private int getCustomCountDirect(Chunk chunk, ScannableElement element) {
+        switch (element.getOverloadCauseSuffix()) {
+            case "chests":
+                return ChunkUtils.countTileEntitiesInChunk(chunk, Material.CHEST) +
+                        ChunkUtils.countTileEntitiesInChunk(chunk, Material.TRAPPED_CHEST);
+            case "shulker_boxes":
+                return ChunkUtils.countAllShulkerBoxesInChunk(chunk);
+            case "pistons":
+                return ChunkUtils.countAllBlocksOfTypeSlow(chunk, Material.PISTON) +
+                        ChunkUtils.countAllBlocksOfTypeSlow(chunk, Material.STICKY_PISTON);
+            default:
+                return ChunkUtils.countTileEntitiesInChunk(chunk, element.getMaterial());
         }
     }
 

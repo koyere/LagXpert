@@ -18,6 +18,7 @@ modules:
 
   # Enables redstone control features (e.g., limiting persistently active redstone).
   # Uses settings from 'redstone.yml'.
+  # Now includes advanced circuit tracking and intelligent shutdown procedures.
   redstone: true
 
   # Enables the alert system for players and console.
@@ -27,18 +28,76 @@ modules:
 
   # Enables the automatic periodic scanning of loaded chunks for over-limit elements.
   # Scan interval and other task-specific settings are in 'task.yml'.
-  auto-chunk-scan: true # Renamed from 'task' for clarity
+  # Now uses performance cache system for improved efficiency.
+  auto-chunk-scan: true
 
   # Enables the automatic item cleaner task and the associated Abyss item recovery system.
   # Detailed settings for cleaning interval, worlds, excluded items, and Abyss
   # are in 'itemcleaner.yml'.
-  item-cleaner: true # Includes Abyss system toggle implicitly or explicitly via itemcleaner.yml
+  item-cleaner: true
+
+  # Enables the automatic entity cleanup system for removing problematic entities.
+  # Includes cleanup of invalid entities, duplicates, abandoned vehicles, and more.
+  # Detailed settings for cleanup targets, exclusions, and performance options
+  # are in 'entitycleanup.yml'.
+  entity-cleanup: true
+
+  # Enables the TPS monitoring and performance tracking system.
+  # Provides real-time TPS calculation, memory usage tracking, chunk statistics,
+  # lag spike detection, and performance analytics with automatic alerts.
+  # Detailed settings for monitoring thresholds, alerts, and analytics
+  # are in 'monitoring.yml'.
+  monitoring: true
 
 # 🧠 Debug Mode
 # If true, LagXpert will output additional information to the server console,
 # which can be helpful for diagnosing issues or understanding plugin behavior.
 # It's recommended to keep this false during normal operation.
+# When enabled, shows detailed cache statistics, async processing info, and circuit tracking data.
 debug: false
+
+# 🚀 Performance Settings (Phase 1 Optimizations)
+# These settings control the new performance optimization features introduced in Phase 1.
+performance:
+  # Cache system settings (applied globally)
+  cache:
+    # Enable/disable the chunk data cache system
+    # The cache significantly improves performance by avoiding repeated chunk scans
+    enabled: true
+
+    # Maximum cache entries before automatic cleanup
+    # Higher values use more memory but provide better performance
+    max-entries: 1000
+
+    # Cache expiry time in seconds
+    # Shorter times ensure data freshness, longer times improve performance
+    expiry-seconds: 30
+
+  # Asynchronous processing settings
+  async:
+    # Enable/disable async chunk analysis
+    # Async processing prevents server lag during heavy chunk scanning operations
+    enabled: true
+
+    # Maximum number of chunks to analyze simultaneously
+    # Higher values process faster but use more system resources
+    max-concurrent-chunks: 10
+
+    # Timeout for async operations in seconds
+    operation-timeout-seconds: 30
+
+  # Advanced redstone control settings
+  redstone:
+    # Enable/disable advanced circuit tracking
+    # Provides intelligent detection of clock circuits and frequency analysis
+    advanced-tracking: true
+
+    # Enable/disable player notifications before redstone shutdown
+    # Gives players warning before their redstone circuits are cut
+    player-notifications: true
+
+    # Grace period in seconds before cutting redstone after notification
+    grace-period-seconds: 3
 
 # Removed 'permissions.bypass-enabled' as it was not implemented.
 # Bypass functionality is handled by individual Bukkit permissions (e.g., lagxpert.bypass.mobs).
