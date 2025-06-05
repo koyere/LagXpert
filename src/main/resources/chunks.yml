@@ -1,0 +1,200 @@
+# LagXpert - Smart Chunk Management Configuration
+# -----------------------------------------------------------------------------
+# This file configures the intelligent chunk management system that optimizes
+# chunk loading and unloading to improve server performance.
+#
+# IMPORTANT: The entire Smart Chunk Management module must first be enabled via
+# 'modules.chunk-management: true' in the main 'config.yml'.
+# Settings in this file only apply if that master module toggle is active.
+# -----------------------------------------------------------------------------
+
+chunk-management:
+  # Automatic chunk unloading system
+  auto-unload:
+    # Enable/disable automatic unloading of inactive chunks
+    enabled: true
+
+    # Time (in minutes) a chunk must be inactive before being considered for unloading
+    # A chunk is considered inactive when no players are within the activity radius
+    inactivity-threshold-minutes: 15
+
+    # Radius (in chunks) around players to consider chunks as "active"
+    # Chunks within this radius will never be unloaded
+    player-activity-radius: 8
+
+    # Minimum number of chunks that must remain loaded per world
+    # Prevents unloading too many chunks which could cause performance issues
+    min-chunks-per-world: 50
+
+    # Maximum number of chunks to unload per cycle
+    # Prevents server lag from unloading too many chunks at once
+    max-unloads-per-cycle: 20
+
+    # Interval (in server ticks) between unload cycles
+    # 1 second = 20 ticks. Default: 1200 ticks = 1 minute
+    unload-cycle-interval-ticks: 1200
+
+  # Chunk preloading system
+  preload:
+    # Enable/disable chunk preloading around players
+    enabled: true
+
+    # Radius (in chunks) around players to preload
+    # Chunks within this radius will be loaded before players reach them
+    preload-radius: 4
+
+    # Maximum number of chunks to preload per cycle
+    # Prevents server lag from loading too many chunks at once
+    max-preloads-per-cycle: 10
+
+    # Interval (in server ticks) between preload cycles
+    # Default: 100 ticks = 5 seconds
+    preload-cycle-interval-ticks: 100
+
+    # Only preload chunks in the direction the player is moving
+    directional-preloading: true
+
+    # Minimum player movement speed to trigger preloading
+    # Players must be moving faster than this (blocks per second) to trigger preloading
+    min-movement-speed: 2.0
+
+  # Chunk activity tracking
+  activity-tracking:
+    # Enable/disable detailed chunk activity tracking
+    enabled: true
+
+    # Track player visits to chunks
+    track-player-visits: true
+
+    # Track block changes in chunks
+    track-block-changes: true
+
+    # Track entity spawning/despawning in chunks
+    track-entity-changes: true
+
+    # Maximum age (in hours) for activity data before cleanup
+    max-activity-age-hours: 24
+
+    # Interval (in server ticks) for activity data cleanup
+    cleanup-interval-ticks: 72000  # 1 hour
+
+  # Border chunk optimization
+  border-chunks:
+    # Enable/disable special handling for world border chunks
+    enabled: true
+
+    # Aggressively unload chunks near world borders
+    aggressive-border-unload: true
+
+    # Distance from world border (in chunks) to consider "border chunks"
+    border-distance-chunks: 10
+
+    # Reduce tick processing for border chunks
+    reduce-border-ticking: true
+
+  # Performance safeguards
+  safeguards:
+    # Never unload chunks containing important blocks
+    protect-important-blocks: true
+
+    # List of important blocks that prevent chunk unloading
+    important-blocks:
+      - "SPAWNER"
+      - "BEACON"
+      - "CONDUIT"
+      - "END_PORTAL"
+      - "NETHER_PORTAL"
+      - "ENDER_CHEST"
+
+    # Never unload chunks with active redstone
+    protect-active-redstone: true
+
+    # Never unload chunks with named entities
+    protect-named-entities: true
+
+    # Never unload chunks with player-built structures
+    # (chunks with high block diversity indicating player construction)
+    protect-player-structures: true
+
+    # Minimum block type diversity to consider a chunk "player-built"
+    structure-diversity-threshold: 20
+
+  # Specific world settings
+  world-settings:
+    # Enable per-world chunk management rules
+    enabled: false
+
+    # Default settings for worlds not specifically configured
+    default:
+      max-loaded-chunks: 1000
+      unload-threshold-minutes: 15
+      preload-enabled: true
+
+    # Specific world configurations
+    # worlds:
+    #   world:
+    #     max-loaded-chunks: 1500
+    #     unload-threshold-minutes: 10
+    #     preload-enabled: true
+    #   world_nether:
+    #     max-loaded-chunks: 500
+    #     unload-threshold-minutes: 5
+    #     preload-enabled: false
+    #   world_the_end:
+    #     max-loaded-chunks: 300
+    #     unload-threshold-minutes: 20
+    #     preload-enabled: false
+
+# Statistics and monitoring
+statistics:
+  # Enable chunk management statistics collection
+  enabled: true
+
+  # Track statistics for performance analysis
+  track:
+    # Total chunks loaded/unloaded
+    chunk-operations: true
+    # Performance impact metrics
+    performance-impact: true
+    # Player movement patterns
+    movement-patterns: true
+    # Memory usage changes
+    memory-impact: true
+
+  # Statistics cleanup
+  cleanup:
+    # Maximum age for statistics (in days)
+    max-age-days: 7
+    # Cleanup interval (in hours)
+    cleanup-interval-hours: 24
+
+# Debug and logging
+debug:
+  # Enable detailed chunk management logging
+  enabled: false
+
+  # Log chunk loading/unloading operations
+  log-operations: false
+
+  # Log chunk activity tracking
+  log-activity: false
+
+  # Log performance impact
+  log-performance: false
+
+  # Include chunk coordinates in logs
+  include-coordinates: false
+
+# Messages for chunk management operations
+messages:
+  # Message sent when chunks are unloaded (if broadcasting is enabled)
+  chunks-unloaded: "&7[ChunkManager] Unloaded &e{count}&7 inactive chunks to improve performance."
+
+  # Message sent when preloading chunks (debug only)
+  chunks-preloaded: "&7[ChunkManager] Preloaded &e{count}&7 chunks for player &f{player}&7."
+
+  # Enable broadcasting of chunk management operations
+  broadcast-operations: false
+
+  # Only broadcast if more than this number of chunks are affected
+  broadcast-threshold: 10

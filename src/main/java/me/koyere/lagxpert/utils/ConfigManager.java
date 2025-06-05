@@ -1,19 +1,26 @@
 package me.koyere.lagxpert.utils;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.config.WorldConfigManager;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.logging.Level;
 
 /**
  * Loads and provides access to LagXpert configuration values
  * from modular YAML files and the main config.yml.
  * Initializes MessageManager with the messages configuration.
  * All configurations are loaded into static fields for easy access.
+ * Enhanced with per-world configuration support through WorldConfigManager integration.
+ * Extended with setter methods for GUI configuration management.
  */
 public class ConfigManager {
 
@@ -27,7 +34,12 @@ public class ConfigManager {
     private static final String ITEMCLEANER_YML = "itemcleaner.yml";
     private static final String ENTITYCLEANUP_YML = "entitycleanup.yml";
     private static final String MONITORING_YML = "monitoring.yml";
+    private static final String CHUNKS_YML = "chunks.yml";
     private static final String CONFIG_YML = "config.yml"; // Main configuration
+
+    // Store loaded configurations for setter operations
+    private static final Map<String, FileConfiguration> loadedConfigs = new HashMap<>();
+    private static final Map<String, File> configFiles = new HashMap<>();
 
     // === STORAGE LIMITS (from storage.yml) ===
     private static int maxHoppersPerChunk;
@@ -57,7 +69,8 @@ public class ConfigManager {
     private static boolean autoChunkScanModuleEnabled;
     private static boolean itemCleanerModuleEnabled;
     private static boolean entityCleanupModuleEnabled;
-    private static boolean monitoringModuleEnabled; // NEW
+    private static boolean monitoringModuleEnabled;
+    private static boolean chunkManagementModuleEnabled;
 
     // === FINE-GRAINED ALERT TOGGLES (from alerts.yml) ===
     private static boolean alertOnMobsLimitReached;
@@ -144,7 +157,7 @@ public class ConfigManager {
     private static boolean logStatistics;
     private static boolean includeLocations;
 
-    // === MONITORING CONFIG (settings from monitoring.yml, module toggle from config.yml) === NEW
+    // === MONITORING CONFIG (settings from monitoring.yml, module toggle from config.yml) ===
     private static boolean tpsMonitoringEnabled;
     private static int tpsUpdateIntervalTicks;
     private static int tpsShortTermWindow;
@@ -195,12 +208,64 @@ public class ConfigManager {
     private static boolean includeStackTraces;
     private static boolean logMonitoringPerformance;
 
+    // === CHUNK MANAGEMENT CONFIG (settings from chunks.yml, module toggle from config.yml) ===
+    private static boolean autoUnloadEnabled;
+    private static int inactivityThresholdMinutes;
+    private static int playerActivityRadius;
+    private static int minChunksPerWorld;
+    private static int maxUnloadsPerCycle;
+    private static int unloadCycleIntervalTicks;
+    private static boolean preloadEnabled;
+    private static int preloadRadius;
+    private static int maxPreloadsPerCycle;
+    private static int preloadCycleIntervalTicks;
+    private static boolean directionalPreloading;
+    private static double minMovementSpeed;
+    private static boolean activityTrackingEnabled;
+    private static boolean trackPlayerVisits;
+    private static boolean trackBlockChanges;
+    private static boolean trackEntityChanges;
+    private static int maxActivityAgeHours;
+    private static int activityCleanupIntervalTicks;
+    private static boolean borderChunksEnabled;
+    private static boolean aggressiveBorderUnload;
+    private static int borderDistanceChunks;
+    private static boolean reduceBorderTicking;
+    private static boolean protectImportantBlocks;
+    private static boolean protectActiveRedstone;
+    private static boolean protectNamedEntities;
+    private static boolean protectPlayerStructures;
+    private static int structureDiversityThreshold;
+    private static boolean perWorldSettingsEnabled;
+    private static boolean chunkStatisticsEnabled;
+    private static boolean trackChunkOperations;
+    private static boolean trackPerformanceImpact;
+    private static boolean trackMovementPatterns;
+    private static boolean trackMemoryImpact;
+    private static int statisticsMaxAgeDays;
+    private static int statisticsCleanupIntervalHours;
+    private static boolean chunkDebugEnabled;
+    private static boolean logChunkOperations;
+    private static boolean logChunkActivity;
+    private static boolean logChunkPerformance;
+    private static boolean includeChunkCoordinates;
+    private static String chunksUnloadedMessage;
+    private static String chunksPreloadedMessage;
+    private static boolean broadcastChunkOperations;
+    private static int chunkBroadcastThreshold;
+
     // === GENERAL OPTIONS (from config.yml) ===
     private static boolean debugEnabled;
 
     private static FileConfiguration loadConfigurationFile(File pluginFolder, String fileName) {
         File configFile = new File(pluginFolder, fileName);
-        return YamlConfiguration.loadConfiguration(configFile);
+        FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+
+        // Store for setter operations
+        loadedConfigs.put(fileName, config);
+        configFiles.put(fileName, configFile);
+
+        return config;
     }
 
     public static void loadAll() {
@@ -215,6 +280,7 @@ public class ConfigManager {
         FileConfiguration itemCleanerConfig = loadConfigurationFile(pluginFolder, ITEMCLEANER_YML);
         FileConfiguration entityCleanupConfig = loadConfigurationFile(pluginFolder, ENTITYCLEANUP_YML);
         FileConfiguration monitoringConfig = loadConfigurationFile(pluginFolder, MONITORING_YML);
+        FileConfiguration chunksConfig = loadConfigurationFile(pluginFolder, CHUNKS_YML);
         FileConfiguration messagesFileConfig = loadConfigurationFile(pluginFolder, MESSAGES_YML);
 
         MessageManager.initialize(messagesFileConfig);
@@ -227,7 +293,8 @@ public class ConfigManager {
         autoChunkScanModuleEnabled = mainConfig.getBoolean("modules.auto-chunk-scan", true);
         itemCleanerModuleEnabled = mainConfig.getBoolean("modules.item-cleaner", true);
         entityCleanupModuleEnabled = mainConfig.getBoolean("modules.entity-cleanup", true);
-        monitoringModuleEnabled = mainConfig.getBoolean("modules.monitoring", true); // NEW
+        monitoringModuleEnabled = mainConfig.getBoolean("modules.monitoring", true);
+        chunkManagementModuleEnabled = mainConfig.getBoolean("modules.chunk-management", true);
 
         // === FINE-GRAINED ALERT TOGGLES (from alerts.yml) ===
         alertOnMobsLimitReached = alertsConfig.getBoolean("show-limit-reached-alerts.mobs", true);
@@ -355,7 +422,7 @@ public class ConfigManager {
         logStatistics = entityCleanupConfig.getBoolean("debug.log-statistics", true);
         includeLocations = entityCleanupConfig.getBoolean("debug.include-locations", false);
 
-        // === MONITORING CONFIG (settings from monitoring.yml) === NEW
+        // === MONITORING CONFIG (settings from monitoring.yml) ===
         tpsMonitoringEnabled = monitoringConfig.getBoolean("monitoring.tps.enabled", true);
         tpsUpdateIntervalTicks = monitoringConfig.getInt("monitoring.tps.update-interval-ticks", 20);
         tpsShortTermWindow = monitoringConfig.getInt("monitoring.tps.calculation-windows.short-term", 60);
@@ -412,8 +479,494 @@ public class ConfigManager {
         includeStackTraces = monitoringConfig.getBoolean("debug.include-stack-traces", false);
         logMonitoringPerformance = monitoringConfig.getBoolean("debug.log-monitoring-performance", false);
 
+        // === CHUNK MANAGEMENT CONFIG (settings from chunks.yml) ===
+        autoUnloadEnabled = chunksConfig.getBoolean("chunk-management.auto-unload.enabled", true);
+        inactivityThresholdMinutes = chunksConfig.getInt("chunk-management.auto-unload.inactivity-threshold-minutes", 15);
+        playerActivityRadius = chunksConfig.getInt("chunk-management.auto-unload.player-activity-radius", 8);
+        minChunksPerWorld = chunksConfig.getInt("chunk-management.auto-unload.min-chunks-per-world", 50);
+        maxUnloadsPerCycle = chunksConfig.getInt("chunk-management.auto-unload.max-unloads-per-cycle", 20);
+        unloadCycleIntervalTicks = chunksConfig.getInt("chunk-management.auto-unload.unload-cycle-interval-ticks", 1200);
+
+        preloadEnabled = chunksConfig.getBoolean("chunk-management.preload.enabled", true);
+        preloadRadius = chunksConfig.getInt("chunk-management.preload.preload-radius", 4);
+        maxPreloadsPerCycle = chunksConfig.getInt("chunk-management.preload.max-preloads-per-cycle", 10);
+        preloadCycleIntervalTicks = chunksConfig.getInt("chunk-management.preload.preload-cycle-interval-ticks", 100);
+        directionalPreloading = chunksConfig.getBoolean("chunk-management.preload.directional-preloading", true);
+        minMovementSpeed = chunksConfig.getDouble("chunk-management.preload.min-movement-speed", 2.0);
+
+        activityTrackingEnabled = chunksConfig.getBoolean("chunk-management.activity-tracking.enabled", true);
+        trackPlayerVisits = chunksConfig.getBoolean("chunk-management.activity-tracking.track-player-visits", true);
+        trackBlockChanges = chunksConfig.getBoolean("chunk-management.activity-tracking.track-block-changes", true);
+        trackEntityChanges = chunksConfig.getBoolean("chunk-management.activity-tracking.track-entity-changes", true);
+        maxActivityAgeHours = chunksConfig.getInt("chunk-management.activity-tracking.max-activity-age-hours", 24);
+        activityCleanupIntervalTicks = chunksConfig.getInt("chunk-management.activity-tracking.cleanup-interval-ticks", 72000);
+
+        borderChunksEnabled = chunksConfig.getBoolean("chunk-management.border-chunks.enabled", true);
+        aggressiveBorderUnload = chunksConfig.getBoolean("chunk-management.border-chunks.aggressive-border-unload", true);
+        borderDistanceChunks = chunksConfig.getInt("chunk-management.border-chunks.border-distance-chunks", 10);
+        reduceBorderTicking = chunksConfig.getBoolean("chunk-management.border-chunks.reduce-border-ticking", true);
+
+        protectImportantBlocks = chunksConfig.getBoolean("chunk-management.safeguards.protect-important-blocks", true);
+        protectActiveRedstone = chunksConfig.getBoolean("chunk-management.safeguards.protect-active-redstone", true);
+        protectNamedEntities = chunksConfig.getBoolean("chunk-management.safeguards.protect-named-entities", true);
+        protectPlayerStructures = chunksConfig.getBoolean("chunk-management.safeguards.protect-player-structures", true);
+        structureDiversityThreshold = chunksConfig.getInt("chunk-management.safeguards.structure-diversity-threshold", 20);
+
+        perWorldSettingsEnabled = chunksConfig.getBoolean("chunk-management.world-settings.enabled", false);
+
+        chunkStatisticsEnabled = chunksConfig.getBoolean("statistics.enabled", true);
+        trackChunkOperations = chunksConfig.getBoolean("statistics.track.chunk-operations", true);
+        trackPerformanceImpact = chunksConfig.getBoolean("statistics.track.performance-impact", true);
+        trackMovementPatterns = chunksConfig.getBoolean("statistics.track.movement-patterns", true);
+        trackMemoryImpact = chunksConfig.getBoolean("statistics.track.memory-impact", true);
+        statisticsMaxAgeDays = chunksConfig.getInt("statistics.cleanup.max-age-days", 7);
+        statisticsCleanupIntervalHours = chunksConfig.getInt("statistics.cleanup.cleanup-interval-hours", 24);
+
+        chunkDebugEnabled = chunksConfig.getBoolean("debug.enabled", false);
+        logChunkOperations = chunksConfig.getBoolean("debug.log-operations", false);
+        logChunkActivity = chunksConfig.getBoolean("debug.log-activity", false);
+        logChunkPerformance = chunksConfig.getBoolean("debug.log-performance", false);
+        includeChunkCoordinates = chunksConfig.getBoolean("debug.include-coordinates", false);
+
+        chunksUnloadedMessage = chunksConfig.getString("messages.chunks-unloaded", "&7[ChunkManager] Unloaded &e{count}&7 inactive chunks to improve performance.");
+        chunksPreloadedMessage = chunksConfig.getString("messages.chunks-preloaded", "&7[ChunkManager] Preloaded &e{count}&7 chunks for player &f{player}&7.");
+        broadcastChunkOperations = chunksConfig.getBoolean("messages.broadcast-operations", false);
+        chunkBroadcastThreshold = chunksConfig.getInt("messages.broadcast-threshold", 10);
+
         // === GENERAL OPTIONS (from config.yml) ===
         debugEnabled = mainConfig.getBoolean("debug", false);
+
+        // === INITIALIZE PER-WORLD CONFIGURATION SYSTEM ===
+        WorldConfigManager.initialize();
+    }
+
+    // === SETTER METHODS FOR GUI CONFIGURATION CHANGES ===
+
+    /**
+     * Applies GUI configuration changes from a map of key-value pairs.
+     * This method handles all configuration changes made through the GUI system.
+     *
+     * @param changes Map containing configuration keys and their new values
+     * @return true if all changes were applied successfully, false otherwise
+     */
+    public static boolean applyGUIChanges(Map<String, Object> changes) {
+        if (changes == null || changes.isEmpty()) {
+            return true;
+        }
+
+        boolean allSuccessful = true;
+
+        try {
+            for (Map.Entry<String, Object> entry : changes.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+
+                if (!applySingleChange(key, value)) {
+                    allSuccessful = false;
+                    LagXpert.getInstance().getLogger().warning("Failed to apply GUI change: " + key + " = " + value);
+                }
+            }
+
+            // Save all modified configuration files
+            if (allSuccessful) {
+                saveAllModifiedConfigs();
+            }
+
+        } catch (Exception e) {
+            LagXpert.getInstance().getLogger().log(Level.SEVERE, "Error applying GUI changes", e);
+            return false;
+        }
+
+        return allSuccessful;
+    }
+
+    /**
+     * Applies a single configuration change.
+     *
+     * @param key The configuration key
+     * @param value The new value
+     * @return true if the change was applied successfully
+     */
+    private static boolean applySingleChange(String key, Object value) {
+        try {
+            switch (key) {
+                // === MOB LIMITS ===
+                case "mobs-per-chunk":
+                    return setMobLimit((Integer) value);
+                case "mobs-module-enabled":
+                    return setMobsModuleEnabled((Boolean) value);
+
+                // === STORAGE LIMITS ===
+                case "hoppers-per-chunk":
+                    return setHoppersLimit((Integer) value);
+                case "chests-per-chunk":
+                    return setChestsLimit((Integer) value);
+                case "furnaces-per-chunk":
+                    return setFurnacesLimit((Integer) value);
+                case "blast-furnaces-per-chunk":
+                    return setBlastFurnacesLimit((Integer) value);
+                case "smokers-per-chunk":
+                    return setSmokersLimit((Integer) value);
+                case "barrels-per-chunk":
+                    return setBarrelsLimit((Integer) value);
+                case "droppers-per-chunk":
+                    return setDroppersLimit((Integer) value);
+                case "dispensers-per-chunk":
+                    return setDispensersLimit((Integer) value);
+                case "shulker-boxes-per-chunk":
+                    return setShulkerBoxesLimit((Integer) value);
+                case "tnt-per-chunk":
+                    return setTntLimit((Integer) value);
+                case "pistons-per-chunk":
+                    return setPistonsLimit((Integer) value);
+                case "observers-per-chunk":
+                    return setObserversLimit((Integer) value);
+                case "storage-module-enabled":
+                    return setStorageModuleEnabled((Boolean) value);
+
+                // === REDSTONE SETTINGS ===
+                case "redstone-active-ticks":
+                    return setRedstoneActiveTicks((Integer) value);
+                case "redstone-module-enabled":
+                    return setRedstoneModuleEnabled((Boolean) value);
+
+                // === CLEANUP SETTINGS ===
+                case "item-cleaner-module-enabled":
+                    return setItemCleanerModuleEnabled((Boolean) value);
+                case "entity-cleanup-module-enabled":
+                    return setEntityCleanupModuleEnabled((Boolean) value);
+
+                // === ALERT SETTINGS ===
+                case "alerts-module-enabled":
+                    return setAlertsModuleEnabled((Boolean) value);
+                case "alert-cooldown-seconds":
+                    return setAlertCooldownSeconds((Integer) value);
+
+                // === MONITORING SETTINGS ===
+                case "monitoring-module-enabled":
+                    return setMonitoringModuleEnabled((Boolean) value);
+                case "tps-monitoring-enabled":
+                    return setTPSMonitoringEnabled((Boolean) value);
+                case "memory-monitoring-enabled":
+                    return setMemoryMonitoringEnabled((Boolean) value);
+
+                // === ADVANCED SETTINGS ===
+                case "debug-enabled":
+                    return setDebugEnabled((Boolean) value);
+                case "chunk-management-enabled":
+                    return setChunkManagementModuleEnabled((Boolean) value);
+
+                default:
+                    LagXpert.getInstance().getLogger().warning("Unknown GUI configuration key: " + key);
+                    return false;
+            }
+        } catch (ClassCastException e) {
+            LagXpert.getInstance().getLogger().warning("Invalid value type for key " + key + ": " + value);
+            return false;
+        } catch (Exception e) {
+            LagXpert.getInstance().getLogger().log(Level.WARNING, "Error applying change for key " + key, e);
+            return false;
+        }
+    }
+
+    // === INDIVIDUAL SETTER METHODS ===
+
+    // Mob Limits
+    public static boolean setMobLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(MOBS_YML);
+        if (config != null) {
+            config.set("limits.mobs-per-chunk", limit);
+            maxMobsPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setMobsModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.mobs", enabled);
+            mobsModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    // Storage Limits
+    public static boolean setHoppersLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.hoppers-per-chunk", limit);
+            maxHoppersPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setChestsLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.chests-per-chunk", limit);
+            maxChestsPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setFurnacesLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.furnaces-per-chunk", limit);
+            maxFurnacesPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setBlastFurnacesLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.blast_furnaces-per-chunk", limit);
+            maxBlastFurnacesPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setSmokersLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.smokers-per-chunk", limit);
+            maxSmokersPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setBarrelsLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.barrels-per-chunk", limit);
+            maxBarrelsPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setDroppersLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.droppers-per-chunk", limit);
+            maxDroppersPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setDispensersLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.dispensers-per-chunk", limit);
+            maxDispensersPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setShulkerBoxesLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.shulker_boxes-per-chunk", limit);
+            maxShulkerBoxesPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setTntLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.tnt-per-chunk", limit);
+            maxTntPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setPistonsLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.pistons-per-chunk", limit);
+            maxPistonsPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setObserversLimit(int limit) {
+        FileConfiguration config = loadedConfigs.get(STORAGE_YML);
+        if (config != null) {
+            config.set("limits.observers-per-chunk", limit);
+            maxObserversPerChunk = limit;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setStorageModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.storage", enabled);
+            storageModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    // Redstone Settings
+    public static boolean setRedstoneActiveTicks(int ticks) {
+        FileConfiguration config = loadedConfigs.get(REDSTONE_YML);
+        if (config != null) {
+            config.set("control.redstone-active-ticks", ticks);
+            redstoneActiveTicks = ticks;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setRedstoneModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.redstone", enabled);
+            redstoneControlModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    // Cleanup Settings
+    public static boolean setItemCleanerModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.item-cleaner", enabled);
+            itemCleanerModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setEntityCleanupModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.entity-cleanup", enabled);
+            entityCleanupModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    // Alert Settings
+    public static boolean setAlertsModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.alerts", enabled);
+            alertsModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setAlertCooldownSeconds(int seconds) {
+        FileConfiguration config = loadedConfigs.get(ALERTS_YML);
+        if (config != null) {
+            config.set("alert-cooldown.default-seconds", seconds);
+            alertCooldownDefaultSeconds = seconds;
+            return true;
+        }
+        return false;
+    }
+
+    // Monitoring Settings
+    public static boolean setMonitoringModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.monitoring", enabled);
+            monitoringModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setTPSMonitoringEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(MONITORING_YML);
+        if (config != null) {
+            config.set("monitoring.tps.enabled", enabled);
+            tpsMonitoringEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setMemoryMonitoringEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(MONITORING_YML);
+        if (config != null) {
+            config.set("monitoring.memory.enabled", enabled);
+            memoryMonitoringEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    // Advanced Settings
+    public static boolean setDebugEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("debug", enabled);
+            debugEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean setChunkManagementModuleEnabled(boolean enabled) {
+        FileConfiguration config = loadedConfigs.get(CONFIG_YML);
+        if (config != null) {
+            config.set("modules.chunk-management", enabled);
+            chunkManagementModuleEnabled = enabled;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Saves all modified configuration files to disk.
+     *
+     * @return true if all files were saved successfully
+     */
+    private static boolean saveAllModifiedConfigs() {
+        boolean allSuccessful = true;
+
+        for (Map.Entry<String, FileConfiguration> entry : loadedConfigs.entrySet()) {
+            String fileName = entry.getKey();
+            FileConfiguration config = entry.getValue();
+            File configFile = configFiles.get(fileName);
+
+            if (configFile != null) {
+                try {
+                    config.save(configFile);
+
+                    if (debugEnabled) {
+                        LagXpert.getInstance().getLogger().info("Saved configuration file: " + fileName);
+                    }
+                } catch (IOException e) {
+                    allSuccessful = false;
+                    LagXpert.getInstance().getLogger().log(Level.SEVERE,
+                            "Failed to save configuration file: " + fileName, e);
+                }
+            }
+        }
+
+        return allSuccessful;
     }
 
     // --- Getters for Mob Limits ---
@@ -486,7 +1039,7 @@ public class ConfigManager {
     public static boolean shouldLogStatistics() { return logStatistics; }
     public static boolean shouldIncludeLocations() { return includeLocations; }
 
-    // --- Getters for Monitoring Configuration --- NEW
+    // --- Getters for Monitoring Configuration ---
     public static boolean isMonitoringModuleEnabled() { return monitoringModuleEnabled; }
     public static boolean isTPSMonitoringEnabled() { return tpsMonitoringEnabled; }
     public static int getTPSUpdateIntervalTicks() { return tpsUpdateIntervalTicks; }
@@ -509,8 +1062,8 @@ public class ConfigManager {
     public static boolean isChunkMonitoringEnabled() { return chunkMonitoringEnabled; }
     public static boolean shouldTrackChunkEvents() { return trackChunkEvents; }
     public static int getMaxLoadedChunksWarning() { return maxLoadedChunksWarning; }
-    public static boolean isChunkLoadingRateMonitoring() { return chunkLoadingRateMonitoring; }
     public static int getChunkLoadingRateThreshold() { return chunkLoadingRateThreshold; }
+    public static boolean isChunkLoadingRateMonitoring() { return chunkLoadingRateMonitoring; }
     public static boolean isLagDetectionEnabled() { return lagDetectionEnabled; }
     public static double getLagDetectionThreshold() { return lagDetectionThreshold; }
     public static int getConsecutiveLagSpikesThreshold() { return consecutiveLagSpikesThreshold; }
@@ -537,6 +1090,53 @@ public class ConfigManager {
     public static boolean shouldLogMemoryDetails() { return logMemoryDetails; }
     public static boolean shouldIncludeStackTraces() { return includeStackTraces; }
     public static boolean shouldLogMonitoringPerformance() { return logMonitoringPerformance; }
+
+    // --- Getters for Chunk Management Configuration ---
+    public static boolean isChunkManagementModuleEnabled() { return chunkManagementModuleEnabled; }
+    public static boolean isAutoUnloadEnabled() { return autoUnloadEnabled; }
+    public static int getChunkInactivityThresholdMinutes() { return inactivityThresholdMinutes; }
+    public static int getPlayerActivityRadius() { return playerActivityRadius; }
+    public static int getMinChunksPerWorld() { return minChunksPerWorld; }
+    public static int getMaxUnloadsPerCycle() { return maxUnloadsPerCycle; }
+    public static int getUnloadCycleIntervalTicks() { return unloadCycleIntervalTicks; }
+    public static boolean isChunkPreloadEnabled() { return preloadEnabled; }
+    public static int getPreloadRadius() { return preloadRadius; }
+    public static int getMaxPreloadsPerCycle() { return maxPreloadsPerCycle; }
+    public static int getPreloadCycleIntervalTicks() { return preloadCycleIntervalTicks; }
+    public static boolean isDirectionalPreloadingEnabled() { return directionalPreloading; }
+    public static double getMinMovementSpeed() { return minMovementSpeed; }
+    public static boolean isChunkActivityTrackingEnabled() { return activityTrackingEnabled; }
+    public static boolean shouldTrackPlayerVisits() { return trackPlayerVisits; }
+    public static boolean shouldTrackBlockChanges() { return trackBlockChanges; }
+    public static boolean shouldTrackEntityChanges() { return trackEntityChanges; }
+    public static int getMaxActivityAgeHours() { return maxActivityAgeHours; }
+    public static int getActivityCleanupIntervalTicks() { return activityCleanupIntervalTicks; }
+    public static boolean isBorderChunksEnabled() { return borderChunksEnabled; }
+    public static boolean shouldAggressiveBorderUnload() { return aggressiveBorderUnload; }
+    public static int getBorderDistanceChunks() { return borderDistanceChunks; }
+    public static boolean shouldReduceBorderTicking() { return reduceBorderTicking; }
+    public static boolean shouldProtectImportantBlocks() { return protectImportantBlocks; }
+    public static boolean shouldProtectActiveRedstone() { return protectActiveRedstone; }
+    public static boolean shouldProtectNamedEntities() { return protectNamedEntities; }
+    public static boolean shouldProtectPlayerStructures() { return protectPlayerStructures; }
+    public static int getStructureDiversityThreshold() { return structureDiversityThreshold; }
+    public static boolean isPerWorldSettingsEnabled() { return perWorldSettingsEnabled; }
+    public static boolean isChunkStatisticsEnabled() { return chunkStatisticsEnabled; }
+    public static boolean shouldTrackChunkOperations() { return trackChunkOperations; }
+    public static boolean shouldTrackPerformanceImpact() { return trackPerformanceImpact; }
+    public static boolean shouldTrackMovementPatterns() { return trackMovementPatterns; }
+    public static boolean shouldTrackMemoryImpact() { return trackMemoryImpact; }
+    public static int getStatisticsMaxAgeDays() { return statisticsMaxAgeDays; }
+    public static int getStatisticsCleanupIntervalHours() { return statisticsCleanupIntervalHours; }
+    public static boolean isChunkDebugEnabled() { return chunkDebugEnabled; }
+    public static boolean shouldLogChunkOperations() { return logChunkOperations; }
+    public static boolean shouldLogChunkActivity() { return logChunkActivity; }
+    public static boolean shouldLogChunkPerformance() { return logChunkPerformance; }
+    public static boolean shouldIncludeChunkCoordinates() { return includeChunkCoordinates; }
+    public static String getChunksUnloadedMessage() { return chunksUnloadedMessage; }
+    public static String getChunksPreloadedMessage() { return chunksPreloadedMessage; }
+    public static boolean shouldBroadcastChunkOperations() { return broadcastChunkOperations; }
+    public static int getChunkBroadcastThreshold() { return chunkBroadcastThreshold; }
 
     // --- Getters for Module Toggles (Master switches from config.yml) ---
     public static boolean isAlertsModuleEnabled() { return alertsModuleEnabled; }
@@ -581,16 +1181,16 @@ public class ConfigManager {
     public static boolean shouldAutoScanTriggerIndividualNearLimitWarnings() { return autoScanTriggerIndividualNearLimitWarnings; }
 
     // --- Getter for Alert Cooldown (from alerts.yml) ---
-    /**
-     * Gets the default cooldown period in seconds for alerts.
-     * If an alert for a specific condition is sent to a player,
-     * the same alert for the same condition will not be re-sent until this period has passed.
-     * A value of 0 typically disables the cooldown.
-     *
-     * @return The default alert cooldown in seconds.
-     */
     public static int getAlertCooldownDefaultSeconds() { return alertCooldownDefaultSeconds; }
 
     // --- Getter for Debug Mode ---
     public static boolean isDebugEnabled() { return debugEnabled; }
+
+    /**
+     * Reloads all configurations including per-world settings.
+     * This method should be called when configurations need to be refreshed.
+     */
+    public static void reloadAll() {
+        loadAll(); // This will also reinitialize WorldConfigManager
+    }
 }

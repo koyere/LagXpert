@@ -49,6 +49,13 @@ modules:
   # are in 'monitoring.yml'.
   monitoring: true
 
+  # Enables the smart chunk management system for optimized chunk loading/unloading.
+  # Provides intelligent chunk activity tracking, automatic unloading of inactive chunks,
+  # directional preloading based on player movement, and comprehensive chunk analytics.
+  # Detailed settings for unloading thresholds, preloading behavior, and activity tracking
+  # are in 'chunks.yml'.
+  chunk-management: true
+
 # 🧠 Debug Mode
 # If true, LagXpert will output additional information to the server console,
 # which can be helpful for diagnosing issues or understanding plugin behavior.

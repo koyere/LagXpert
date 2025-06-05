@@ -14,6 +14,7 @@ general:
   no-permission: "&cYou don't have permission to use this command."
   players-only: "&cThis command can only be used by players."
   invalid-command: "&cUnknown subcommand. Use &e/lagxpert help &cfor available commands."
+  unknown-subcommand: "&cUnknown subcommand: &e{subcommand}&c. Use &e/lagxpertgui help &cfor available commands."
   command-not-implemented: "&eThis feature is not yet implemented."
   config-reloaded: "&aLagXpert configuration has been reloaded successfully!"
   error-occurred: "&cAn error occurred. Please check the console."
@@ -54,6 +55,23 @@ clearitems:
   broadcast: "&7[&cItemClear&7] &e{player} &7cleared &c{count} &7item(s) from &f{world_or_all}&7."
   usage: "&cInvalid command. Usage: &e/clearitems [all | <world_name>]"
 
+# == GUI System Messages ==
+gui:
+  opened: "&aConfiguration GUI opened successfully!"
+  closed: "&7Configuration GUI closed."
+  already-open: "&cYou already have a GUI open. Close it first before opening another."
+  server-busy: "&cThe server is currently busy. Too many GUI sessions are active. Please try again later."
+  session-expired: "&cYour GUI session has expired due to inactivity."
+  system-not-initialized: "&cThe GUI system is not properly initialized. Please contact an administrator."
+  no-gui-open: "&cYou don't have any GUI open to close."
+  feature-coming-soon: "&eThis feature is coming soon! Stay tuned for updates."
+  pending-change: "&ePending change: &f{setting} &e→ &a{value}&e. Use Save & Close to apply."
+  module-toggled: "&e{module} module &f{status}&e. Use Save & Close to apply changes."
+  changes-saved: "&aSuccessfully saved &e{count} &aconfiguration change(s)!"
+  no-changes: "&7No pending changes to save."
+  reload-success: "&aGUI system configurations reloaded successfully!"
+  reload-failed: "&cFailed to reload GUI system configurations. Check console for errors."
+
 # == Limit Alerts (Used by Listeners and Tasks) ==
 # CORRECTED: Keys are now singular to match StorageListener.java expectations.
 limits:
@@ -77,6 +95,21 @@ limits:
 alerts:
   chunk-scan:
     overloaded-summary: "&cChunk [{chunk_x},{chunk_z}] in world '{world}' is overloaded: &e{details}"
+
+  # == Performance Monitoring Alert Messages ==
+  messages:
+    # TPS Alert Messages
+    tps-critical: "&c[CRITICAL] &fServer TPS is critically low: &c{tps}&f/20.00! Immediate attention required!"
+    tps-warning: "&e[WARNING] &fServer TPS is below normal: &e{tps}&f/20.00. Performance degraded."
+    tps-recovery: "&a[RECOVERY] &fServer TPS has recovered: &a{tps}&f/20.00. Performance restored."
+
+    # Memory Alert Messages
+    memory-critical: "&c[CRITICAL] &fMemory usage is critically high: &c{usage}%&f! Server may crash soon!"
+    memory-warning: "&e[WARNING] &fMemory usage is high: &e{usage}%&f. Consider restarting or optimizing."
+    memory-recovery: "&a[RECOVERY] &fMemory usage has returned to normal: &a{usage}%&f."
+
+    # Lag Spike Alert Messages
+    lag-spike: "&c[LAG SPIKE] &fDetected lag spike: &c{tick_time}ms&f tick duration"
 
 # == /lagxpert chunkload Redirect Message ==
 chunkload:

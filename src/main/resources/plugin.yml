@@ -3,7 +3,7 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 1.4
+version: 2.0
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
 description: Monitors and controls server lag sources such as chunk limits, redstone, entities, and storage blocks.
 author: Koyere
@@ -24,6 +24,13 @@ commands:
     aliases: [lx, lagx]
     permission: lagxpert.use
     permission-message: "You do not have permission to use this command."
+
+  lagxpertgui:
+    description: Opens the interactive GUI configuration interface for LagXpert.
+    usage: "/lagxpertgui [open|close|reload|sessions|help]"
+    aliases: [lxgui, lagxgui]
+    permission: lagxpert.gui
+    permission-message: "You do not have permission to use the GUI interface."
 
   chunkstatus:
     description: Displays usage information for the player's current chunk.
@@ -82,6 +89,20 @@ permissions:
     default: true
   lagxpert.monitoring.alerts:
     description: Allows receiving monitoring alerts for performance issues.
+    default: op
+
+  # GUI System Permissions
+  lagxpert.gui:
+    description: Allows access to the GUI configuration interface.
+    default: op
+  lagxpert.gui.basic:
+    description: Allows basic GUI configuration (entity limits, block limits).
+    default: op
+  lagxpert.gui.advanced:
+    description: Allows access to advanced GUI configuration options.
+    default: op
+  lagxpert.gui.admin:
+    description: Allows GUI administrative functions (reload, sessions).
     default: op
 
   # Bypass Permissions Node - grants all specific bypass permissions if given.

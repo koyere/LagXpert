@@ -1,0 +1,38 @@
+# LagXpert - Per-World Configuration for: world_the_end
+# This file allows you to override global settings for this specific world.
+# Only include settings you want to override - missing settings will use global defaults.
+# You can copy any setting from the main config files (mobs.yml, storage.yml, etc.) here.
+#
+# Example overrides:
+# limits:
+#   mobs-per-chunk: 30        # Override global mob limit
+#   hoppers-per-chunk: 5      # Override global hopper limit
+#
+# monitoring:
+#   tps:
+#     alert-thresholds:
+#       warning: 16.0         # Different TPS warning for this world
+#
+# Remove or comment out sections you don't want to override.
+
+# End-specific overrides - very restrictive limits for the end
+limits:
+  mobs-per-chunk: 20
+  hoppers-per-chunk: 4
+  chests-per-chunk: 10
+
+# Disable certain features in the end
+chunk-management:
+  preload:
+    enabled: false
+
+item-cleaner:
+  warning:
+    enabled: false # No warnings in end
+
+# Stricter performance monitoring
+monitoring:
+  tps:
+    alert-thresholds:
+      warning: 18.5
+      critical: 16.0

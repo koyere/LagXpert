@@ -1,0 +1,36 @@
+# LagXpert - Per-World Configuration for: world_nether
+# This file allows you to override global settings for this specific world.
+# Only include settings you want to override - missing settings will use global defaults.
+# You can copy any setting from the main config files (mobs.yml, storage.yml, etc.) here.
+#
+# Example overrides:
+# limits:
+#   mobs-per-chunk: 30        # Override global mob limit
+#   hoppers-per-chunk: 5      # Override global hopper limit
+#
+# monitoring:
+#   tps:
+#     alert-thresholds:
+#       warning: 16.0         # Different TPS warning for this world
+#
+# Remove or comment out sections you don't want to override.
+
+# Nether-specific overrides - lower limits due to hostile environment
+limits:
+  mobs-per-chunk: 25
+  hoppers-per-chunk: 6
+  tnt-per-chunk: 0 # No TNT in nether by default
+
+# More aggressive entity cleanup in nether
+entity-cleanup:
+  cleanup-targets:
+    abandoned-vehicles: true
+  advanced:
+    max-entities-per-chunk: 150
+
+# Different TPS thresholds for nether
+monitoring:
+  tps:
+    alert-thresholds:
+      warning: 17.0
+      critical: 14.0
