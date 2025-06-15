@@ -90,20 +90,37 @@ public class LagXpert extends JavaPlugin {
     /**
      * Saves all default configuration files from the JAR to the plugin's data folder
      * if they do not already exist. This ensures users have the default configs on first run.
-     * Enhanced to include Phase 1 & 2 configuration files.
+     * Enhanced to include Phase 1 & 2 configuration files and prevent unnecessary warnings.
      */
     private void saveDefaultConfigurations() {
-        saveDefaultConfig(); // Saves config.yml
-        saveResource("mobs.yml", false);
-        saveResource("storage.yml", false);
-        saveResource("redstone.yml", false);
-        saveResource("alerts.yml", false);
-        saveResource("task.yml", false);
-        saveResource("messages.yml", false);
-        saveResource("itemcleaner.yml", false);
-        saveResource("entitycleanup.yml", false); // Phase 1 entity cleanup config
-        saveResource("monitoring.yml", false); // Phase 2 monitoring config
-        saveResource("chunks.yml", false); // Phase 2 chunk management config
+        // Save config.yml (always handled by saveDefaultConfig())
+        saveDefaultConfig();
+
+        // List of configuration files to check and save
+        String[] configFiles = {
+                "mobs.yml",
+                "storage.yml",
+                "redstone.yml",
+                "alerts.yml",
+                "task.yml",
+                "messages.yml",
+                "itemcleaner.yml",
+                "entitycleanup.yml", // Phase 1 entity cleanup config
+                "monitoring.yml",    // Phase 2 monitoring config
+                "chunks.yml"         // Phase 2 chunk management config
+        };
+
+        // Only save files that don't exist to prevent warnings
+        for (String fileName : configFiles) {
+            File configFile = new File(getDataFolder(), fileName);
+            if (!configFile.exists()) {
+                saveResource(fileName, false);
+
+                if (ConfigManager.isDebugEnabled()) {
+                    getLogger().info("[LagXpert] Created default configuration file: " + fileName);
+                }
+            }
+        }
     }
 
     /**

@@ -3,7 +3,7 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 2.0
+version: 2.1.1
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
 description: Monitors and controls server lag sources such as chunk limits, redstone, entities, and storage blocks.
 author: Koyere

@@ -20,10 +20,9 @@ import java.util.stream.Collectors;
  * Periodically removes dropped items from the ground to reduce lag.
  * Supports exclusions and per-world filtering by fetching configuration from ConfigManager.
  * Integrates with Abyss recovery system and handles its own warning cycle.
+ * Fixed exclusion logic to properly handle excluded items.
  */
 public class ItemCleanerTask extends BukkitRunnable {
-
-    // No instance fields for configuration; all settings are pulled from ConfigManager on demand.
 
     @Override
     public void run() {
@@ -31,7 +30,7 @@ public class ItemCleanerTask extends BukkitRunnable {
         // It will handle the warning and then trigger the actual cleanup.
 
         // Use the master module toggle from config.yml
-        if (!ConfigManager.isItemCleanerModuleEnabled()) { // CORRECTED: Was isItemCleanerEnabled
+        if (!ConfigManager.isItemCleanerModuleEnabled()) {
             return;
         }
 
@@ -40,7 +39,7 @@ public class ItemCleanerTask extends BukkitRunnable {
             String warningMessageTemplate = ConfigManager.getItemCleanerWarningMessage();
 
             String messageContent = warningMessageTemplate.replace("{seconds}", String.valueOf(warningSeconds));
-            Bukkit.broadcastMessage(MessageManager.color(messageContent)); // Use MessageManager.color()
+            Bukkit.broadcastMessage(MessageManager.color(messageContent));
 
             // Schedule the actual cleanup to run after the warning period.
             new BukkitRunnable() {
@@ -65,7 +64,7 @@ public class ItemCleanerTask extends BukkitRunnable {
      */
     private static int performCleanupForAllWorlds(Player actor) {
         int totalItemsRemoved = 0;
-        List<String> enabledWorlds = ConfigManager.getItemCleanerEnabledWorlds(); // Fetches current config
+        List<String> enabledWorlds = ConfigManager.getItemCleanerEnabledWorlds();
 
         if (ConfigManager.isDebugEnabled() && actor == null) {
             LagXpert.getInstance().getLogger().info("[LagXpert] ItemCleanerTask: Starting automatic cleanup cycle.");
@@ -81,7 +80,7 @@ public class ItemCleanerTask extends BukkitRunnable {
         if (totalItemsRemoved > 0 && actor == null) { // Broadcast only for automatic cleanup
             String cleanedMessageTemplate = ConfigManager.getItemCleanerCleanedMessage();
             String messageContent = cleanedMessageTemplate.replace("{count}", String.valueOf(totalItemsRemoved));
-            Bukkit.broadcastMessage(MessageManager.color(messageContent)); // Use MessageManager.color()
+            Bukkit.broadcastMessage(MessageManager.color(messageContent));
         }
 
         if (totalItemsRemoved > 0) {
@@ -97,7 +96,7 @@ public class ItemCleanerTask extends BukkitRunnable {
 
     /**
      * Clears items from a specific world based on current configuration.
-     * This method is static.
+     * Fixed to properly handle excluded items.
      *
      * @param world The world to clear items from.
      * @param actor The player who initiated the cleanup (for Abyss context), or null if automatic.
@@ -105,34 +104,102 @@ public class ItemCleanerTask extends BukkitRunnable {
      */
     private static int clearItemsFromSpecificWorld(World world, Player actor) {
         int itemsRemovedInWorld = 0;
+
+        // Get excluded items and convert to uppercase for case-insensitive comparison
         Set<String> excludedItemsUpper = ConfigManager.getItemCleanerExcludedItems().stream()
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
 
+        if (ConfigManager.isDebugEnabled()) {
+            LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Excluded items: " + excludedItemsUpper);
+        }
+
         for (Item itemEntity : world.getEntitiesByClass(Item.class)) {
-            ItemStack itemStack = itemEntity.getItemStack();
+            try {
+                ItemStack itemStack = itemEntity.getItemStack();
 
-            if (itemStack == null || itemStack.getType().isAir()) {
-                continue;
-            }
+                // Skip invalid items
+                if (itemStack == null || itemStack.getType().isAir()) {
+                    continue;
+                }
 
-            if (excludedItemsUpper.contains(itemStack.getType().name().toUpperCase())) {
-                continue;
-            }
+                // Check if item is excluded - FIXED: Compare material name properly
+                String materialName = itemStack.getType().name().toUpperCase();
+                if (excludedItemsUpper.contains(materialName)) {
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Skipping excluded item: " + materialName);
+                    }
+                    continue;
+                }
 
-            // Check if Abyss is active before attempting to add items.
-            // Abyss is active if itemCleanerModule is enabled AND abyss specific toggle in itemcleaner.yml is true
-            if (ConfigManager.isAbyssEnabled()) {
-                if (actor != null) {
-                    AbyssManager.add(actor, itemStack);
-                } else if (itemEntity.getThrower() != null) {
-                    AbyssManager.add(itemEntity);
+                // Skip items with custom names (often important)
+                if (itemStack.hasItemMeta() && itemStack.getItemMeta().hasDisplayName()) {
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Skipping named item: " + itemStack.getItemMeta().getDisplayName());
+                    }
+                    continue;
+                }
+
+                // Skip items with custom lore (often important)
+                if (itemStack.hasItemMeta() && itemStack.getItemMeta().hasLore()) {
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Skipping item with lore: " + materialName);
+                    }
+                    continue;
+                }
+
+                // Skip enchanted items (often valuable)
+                if (itemStack.hasItemMeta() && itemStack.getItemMeta().hasEnchants()) {
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Skipping enchanted item: " + materialName);
+                    }
+                    continue;
+                }
+
+                // Check if Abyss is active before attempting to add items.
+                if (ConfigManager.isAbyssEnabled()) {
+                    if (actor != null) {
+                        AbyssManager.add(actor, itemStack);
+                    } else {
+                        // For automatic cleanup, try to find the item thrower
+                        try {
+                            if (itemEntity.getThrower() != null) {
+                                Player thrower = Bukkit.getPlayer(itemEntity.getThrower());
+                                if (thrower != null) {
+                                    AbyssManager.add(thrower, itemStack);
+                                } else {
+                                    // If thrower is offline, add to abyss with offline player info
+                                    AbyssManager.add(itemEntity);
+                                }
+                            } else {
+                                // No thrower info available, add to general abyss
+                                AbyssManager.add(itemEntity);
+                            }
+                        } catch (Exception e) {
+                            // If there's any issue with abyss, just continue with removal
+                            if (ConfigManager.isDebugEnabled()) {
+                                LagXpert.getInstance().getLogger().warning("[ItemCleanerTask] Failed to add item to abyss: " + e.getMessage());
+                            }
+                        }
+                    }
+                }
+
+                // Remove the item
+                itemEntity.remove();
+                itemsRemovedInWorld++;
+
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Removed item: " + materialName + " (x" + itemStack.getAmount() + ")");
+                }
+
+            } catch (Exception e) {
+                // Log the error but continue with other items
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().warning("[ItemCleanerTask] Error processing item entity: " + e.getMessage());
                 }
             }
-
-            itemEntity.remove();
-            itemsRemovedInWorld++;
         }
+
         return itemsRemovedInWorld;
     }
 

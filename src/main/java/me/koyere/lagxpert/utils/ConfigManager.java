@@ -21,6 +21,7 @@ import java.util.logging.Level;
  * All configurations are loaded into static fields for easy access.
  * Enhanced with per-world configuration support through WorldConfigManager integration.
  * Extended with setter methods for GUI configuration management.
+ * Fixed configuration loading and validation for entity cleanup and item cleaner systems.
  */
 public class ConfigManager {
 
@@ -259,6 +260,12 @@ public class ConfigManager {
 
     private static FileConfiguration loadConfigurationFile(File pluginFolder, String fileName) {
         File configFile = new File(pluginFolder, fileName);
+
+        if (!configFile.exists()) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Configuration file not found: " + fileName);
+            return new YamlConfiguration(); // Return empty config to prevent null pointer exceptions
+        }
+
         FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
 
         // Store for setter operations
@@ -359,13 +366,20 @@ public class ConfigManager {
         itemCleanerIntervalTicks = itemCleanerConfig.getInt("item-cleaner.interval-ticks", 6000);
         itemCleanerInitialDelayTicks = itemCleanerConfig.getLong("item-cleaner.initial-delay-ticks", 6000L);
         itemCleanerWarningEnabled = itemCleanerConfig.getBoolean("item-cleaner.warning.enabled", true);
-        itemCleanerWarningTimeSeconds = itemCleanerConfig.getInt("item-cleaner.warning.time-seconds", 60);
-        itemCleanerWarningMessage = itemCleanerConfig.getString("item-cleaner.messages.warning", "&e[LagXpert] Ground items will be cleared in &c{seconds}&7s.");
-        itemCleanerCleanedMessage = itemCleanerConfig.getString("item-cleaner.messages.cleaned", "&a[LagXpert] Cleared &e{count}&f ground item(s).");
+        itemCleanerWarningTimeSeconds = itemCleanerConfig.getInt("item-cleaner.warning.time-seconds", 10);
+        itemCleanerWarningMessage = itemCleanerConfig.getString("item-cleaner.messages.warning", "&e[LagXpert] &7Ground items will be cleared in &c{seconds}&7 seconds!");
+        itemCleanerCleanedMessage = itemCleanerConfig.getString("item-cleaner.messages.cleaned", "&a[LagXpert] &fCleared &e{count}&f ground item(s).");
+
+        // FIXED: Proper loading of enabled worlds list
         itemCleanerEnabledWorlds = itemCleanerConfig.getStringList("item-cleaner.enabled-worlds");
-        if (itemCleanerEnabledWorlds.isEmpty()) {
-            itemCleanerEnabledWorlds = Collections.singletonList("all");
+        if (itemCleanerEnabledWorlds == null || itemCleanerEnabledWorlds.isEmpty()) {
+            itemCleanerEnabledWorlds = new ArrayList<>();
+            itemCleanerEnabledWorlds.add("world");
+            itemCleanerEnabledWorlds.add("world_nether");
+            itemCleanerEnabledWorlds.add("world_the_end");
         }
+
+        // FIXED: Proper loading of excluded items list
         itemCleanerExcludedItems = itemCleanerConfig.getStringList("item-cleaner.excluded-items");
         if (itemCleanerExcludedItems == null) {
             itemCleanerExcludedItems = new ArrayList<>();
@@ -376,15 +390,20 @@ public class ConfigManager {
         abyssRetentionSeconds = itemCleanerConfig.getInt("abyss.retention-seconds", 120);
         abyssMaxItemsPerPlayer = itemCleanerConfig.getInt("abyss.max-items-per-player", 30);
         abyssRecoverMessage = itemCleanerConfig.getString("abyss.messages.recover", "&aYou recovered &f{count} &aitem(s) from the abyss.");
-        abyssEmptyMessage = itemCleanerConfig.getString("abyss.messages.empty", "&7You have no items to recover.");
-        abyssRecoverFailFullInvMessage = itemCleanerConfig.getString("abyss.messages.recover-fail-full-inv", "&cYour inventory was full, some items may have been dropped!");
+        abyssEmptyMessage = itemCleanerConfig.getString("abyss.messages.empty", "&7You have no items to recover from the abyss.");
+        abyssRecoverFailFullInvMessage = itemCleanerConfig.getString("abyss.messages.recover-fail-full-inv", "&cYour inventory was full! Some recovered items may have been dropped on the ground.");
 
         // === ENTITY CLEANUP CONFIG (settings from entitycleanup.yml) ===
         entityCleanupIntervalTicks = entityCleanupConfig.getInt("entity-cleanup.interval-ticks", 6000);
         entityCleanupInitialDelayTicks = entityCleanupConfig.getLong("entity-cleanup.initial-delay-ticks", 6000L);
+
+        // FIXED: Proper loading of enabled worlds list for entity cleanup
         entityCleanupEnabledWorlds = entityCleanupConfig.getStringList("entity-cleanup.enabled-worlds");
-        if (entityCleanupEnabledWorlds.isEmpty()) {
-            entityCleanupEnabledWorlds = Collections.singletonList("all");
+        if (entityCleanupEnabledWorlds == null || entityCleanupEnabledWorlds.isEmpty()) {
+            entityCleanupEnabledWorlds = new ArrayList<>();
+            entityCleanupEnabledWorlds.add("world");
+            entityCleanupEnabledWorlds.add("world_nether");
+            entityCleanupEnabledWorlds.add("world_the_end");
         }
 
         cleanupInvalidEntities = entityCleanupConfig.getBoolean("entity-cleanup.cleanup-targets.invalid-entities", true);
@@ -401,10 +420,21 @@ public class ConfigManager {
         skipTamedAnimals = entityCleanupConfig.getBoolean("entity-cleanup.advanced.skip-tamed-animals", true);
         skipLeashedEntities = entityCleanupConfig.getBoolean("entity-cleanup.advanced.skip-leashed-entities", true);
 
+        // FIXED: Proper loading of protected entity types list
         protectedEntityTypes = entityCleanupConfig.getStringList("entity-cleanup.exclusions.protected-entity-types");
         if (protectedEntityTypes == null) {
             protectedEntityTypes = new ArrayList<>();
         }
+        // Add default protected entities if list is empty
+        if (protectedEntityTypes.isEmpty()) {
+            protectedEntityTypes.add("VILLAGER");
+            protectedEntityTypes.add("IRON_GOLEM");
+            protectedEntityTypes.add("ENDER_DRAGON");
+            protectedEntityTypes.add("WITHER");
+            protectedEntityTypes.add("PLAYER");
+        }
+
+        // FIXED: Proper loading of blacklisted worlds list
         blacklistedWorlds = entityCleanupConfig.getStringList("entity-cleanup.exclusions.blacklisted-worlds");
         if (blacklistedWorlds == null) {
             blacklistedWorlds = new ArrayList<>();
@@ -538,6 +568,58 @@ public class ConfigManager {
 
         // === INITIALIZE PER-WORLD CONFIGURATION SYSTEM ===
         WorldConfigManager.initialize();
+
+        // Validate critical configurations
+        validateConfigurations();
+    }
+
+    /**
+     * Validates critical configuration values and logs warnings for invalid settings.
+     * ADDED: Configuration validation to prevent runtime issues.
+     */
+    private static void validateConfigurations() {
+        // Validate item cleaner settings
+        if (itemCleanerWarningTimeSeconds < 0) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Invalid item cleaner warning time (negative), using default: 10 seconds");
+            itemCleanerWarningTimeSeconds = 10;
+        }
+
+        if (itemCleanerIntervalTicks < 200) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Item cleaner interval too low (< 10 seconds), using minimum: 200 ticks");
+            itemCleanerIntervalTicks = 200;
+        }
+
+        // Validate entity cleanup settings
+        if (entityCleanupIntervalTicks < 600) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Entity cleanup interval too low (< 30 seconds), using minimum: 600 ticks");
+            entityCleanupIntervalTicks = 600;
+        }
+
+        if (duplicateDetectionRadius < 0.1 || duplicateDetectionRadius > 10.0) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Invalid duplicate detection radius, using default: 1.0");
+            duplicateDetectionRadius = 1.0;
+        }
+
+        // Validate abyss settings
+        if (abyssRetentionSeconds < 30) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Abyss retention time too low (< 30 seconds), using minimum: 30 seconds");
+            abyssRetentionSeconds = 30;
+        }
+
+        if (abyssMaxItemsPerPlayer < 1) {
+            LagXpert.getInstance().getLogger().warning("[ConfigManager] Invalid abyss max items per player, using default: 30");
+            abyssMaxItemsPerPlayer = 30;
+        }
+
+        // Log loaded configurations if debug is enabled
+        if (debugEnabled) {
+            LagXpert.getInstance().getLogger().info("[ConfigManager] Configuration validation completed:");
+            LagXpert.getInstance().getLogger().info("  - Item Cleaner Module: " + (itemCleanerModuleEnabled ? "Enabled" : "Disabled"));
+            LagXpert.getInstance().getLogger().info("  - Entity Cleanup Module: " + (entityCleanupModuleEnabled ? "Enabled" : "Disabled"));
+            LagXpert.getInstance().getLogger().info("  - Abyss System: " + (abyssEnabled ? "Enabled" : "Disabled"));
+            LagXpert.getInstance().getLogger().info("  - Excluded Items: " + itemCleanerExcludedItems.size());
+            LagXpert.getInstance().getLogger().info("  - Protected Entity Types: " + protectedEntityTypes.size());
+        }
     }
 
     // === SETTER METHODS FOR GUI CONFIGURATION CHANGES ===
@@ -578,6 +660,56 @@ public class ConfigManager {
         }
 
         return allSuccessful;
+    }
+
+    /**
+     * Updates excluded items list for item cleaner.
+     * ADDED: Method to dynamically update excluded items.
+     *
+     * @param excludedItems List of material names to exclude from cleanup
+     * @return true if the list was updated successfully
+     */
+    public static boolean updateExcludedItems(List<String> excludedItems) {
+        try {
+            FileConfiguration config = loadedConfigs.get(ITEMCLEANER_YML);
+            if (config != null) {
+                config.set("item-cleaner.excluded-items", excludedItems);
+                itemCleanerExcludedItems = new ArrayList<>(excludedItems);
+
+                if (debugEnabled) {
+                    LagXpert.getInstance().getLogger().info("[ConfigManager] Updated excluded items list: " + excludedItems);
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            LagXpert.getInstance().getLogger().log(Level.WARNING, "Failed to update excluded items", e);
+        }
+        return false;
+    }
+
+    /**
+     * Updates protected entity types list for entity cleanup.
+     * ADDED: Method to dynamically update protected entities.
+     *
+     * @param protectedTypes List of entity type names to protect from cleanup
+     * @return true if the list was updated successfully
+     */
+    public static boolean updateProtectedEntityTypes(List<String> protectedTypes) {
+        try {
+            FileConfiguration config = loadedConfigs.get(ENTITYCLEANUP_YML);
+            if (config != null) {
+                config.set("entity-cleanup.exclusions.protected-entity-types", protectedTypes);
+                protectedEntityTypes = new ArrayList<>(protectedTypes);
+
+                if (debugEnabled) {
+                    LagXpert.getInstance().getLogger().info("[ConfigManager] Updated protected entity types: " + protectedTypes);
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            LagXpert.getInstance().getLogger().log(Level.WARNING, "Failed to update protected entity types", e);
+        }
+        return false;
     }
 
     /**

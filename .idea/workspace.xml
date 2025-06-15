@@ -5,23 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35de2fee-0892-40b4-9e08-a9836878f6a5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/commands/LagXpertGUICommand.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/config/WorldConfigManager.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/gui/ConfigGUI.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/gui/GUIManager.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/system/ChunkManager.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ChunkPreloader.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/InactiveChunkUnloader.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/chunks.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/worlds/world.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/worlds/world_nether.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/worlds/world_the_end.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/EntityCleanupTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/EntityCleanupTask.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/ConfigManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/ConfigManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/config.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/config.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/messages.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/messages.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/plugin.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/plugin.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

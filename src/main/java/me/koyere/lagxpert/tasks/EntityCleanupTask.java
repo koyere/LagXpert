@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Comprehensive entity cleanup task that removes various types of problematic entities
  * to improve server performance. Includes detection and removal of invalid entities,
  * duplicates, abandoned vehicles, and entities outside world borders.
+ * Fixed protection logic for named entities, tamed animals, and other important entities.
  */
 public class EntityCleanupTask extends BukkitRunnable {
 
@@ -26,11 +27,6 @@ public class EntityCleanupTask extends BukkitRunnable {
     private static final AtomicInteger abandonedVehiclesRemoved = new AtomicInteger(0);
     private static final AtomicInteger emptyContainersRemoved = new AtomicInteger(0);
     private static final AtomicInteger outOfBoundsEntitiesRemoved = new AtomicInteger(0);
-
-    // Configuration
-    private static final double DUPLICATE_DETECTION_RADIUS = 1.0; // Radius to check for duplicate entities
-    private static final long ABANDONED_VEHICLE_TIME_MS = 300000; // 5 minutes
-    private static final int MAX_ENTITIES_PER_CHUNK = 200; // Maximum entities per chunk before cleanup
 
     @Override
     public void run() {
@@ -55,6 +51,14 @@ public class EntityCleanupTask extends BukkitRunnable {
 
         long duration = System.currentTimeMillis() - startTime;
         totalEntitiesRemoved.addAndGet(totalCleaned);
+
+        // Broadcast completion message if enabled and threshold is met
+        if (ConfigManager.shouldBroadcastEntityCleanupCompletion() &&
+                totalCleaned >= ConfigManager.getEntityCleanupBroadcastThreshold()) {
+            String message = ConfigManager.getEntityCleanupCompleteMessage()
+                    .replace("{count}", String.valueOf(totalCleaned));
+            Bukkit.broadcastMessage(message);
+        }
 
         if (ConfigManager.isDebugEnabled() || totalCleaned > 0) {
             LagXpert.getInstance().getLogger().info(
@@ -83,29 +87,38 @@ public class EntityCleanupTask extends BukkitRunnable {
 
         for (Entity entity : allEntities) {
             try {
-                // Skip players and important entities
+                // FIXED: Skip entities that should be protected - check this FIRST
                 if (shouldSkipEntity(entity)) {
                     continue;
                 }
 
                 // Check for invalid/corrupted entities
-                if (isInvalidEntity(entity)) {
+                if (ConfigManager.shouldCleanupInvalidEntities() && isInvalidEntity(entity)) {
                     entitiesToRemove.add(entity);
                     invalidEntitiesRemoved.incrementAndGet();
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Marking invalid entity for removal: " + entity.getType());
+                    }
                     continue;
                 }
 
                 // Check if entity is outside world border
-                if (isOutsideWorldBorder(entity)) {
+                if (ConfigManager.shouldCleanupOutOfBoundsEntities() && isOutsideWorldBorder(entity)) {
                     entitiesToRemove.add(entity);
                     outOfBoundsEntitiesRemoved.incrementAndGet();
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Marking out-of-bounds entity for removal: " + entity.getType());
+                    }
                     continue;
                 }
 
                 // Check for abandoned vehicles
-                if (isAbandonedVehicle(entity)) {
+                if (ConfigManager.shouldCleanupAbandonedVehicles() && isAbandonedVehicle(entity)) {
                     entitiesToRemove.add(entity);
                     abandonedVehiclesRemoved.incrementAndGet();
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Marking abandoned vehicle for removal: " + entity.getType());
+                    }
                     continue;
                 }
 
@@ -113,17 +126,24 @@ public class EntityCleanupTask extends BukkitRunnable {
                 if (isEmptyContainer(entity)) {
                     entitiesToRemove.add(entity);
                     emptyContainersRemoved.incrementAndGet();
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Marking empty container for removal: " + entity.getType());
+                    }
                     continue;
                 }
 
-                // Group for duplicate detection
-                String locationKey = getLocationKey(entity.getLocation());
-                entitiesByLocation.computeIfAbsent(locationKey, k -> new ArrayList<>()).add(entity);
+                // Group for duplicate detection only if enabled
+                if (ConfigManager.shouldCleanupDuplicateEntities()) {
+                    String locationKey = getLocationKey(entity.getLocation());
+                    entitiesByLocation.computeIfAbsent(locationKey, k -> new ArrayList<>()).add(entity);
+                }
 
             } catch (Exception e) {
-                // Entity might be corrupted, remove it
-                entitiesToRemove.add(entity);
-                invalidEntitiesRemoved.incrementAndGet();
+                // Entity might be corrupted, remove it if invalid entity cleanup is enabled
+                if (ConfigManager.shouldCleanupInvalidEntities()) {
+                    entitiesToRemove.add(entity);
+                    invalidEntitiesRemoved.incrementAndGet();
+                }
 
                 if (ConfigManager.isDebugEnabled()) {
                     LagXpert.getInstance().getLogger().warning(
@@ -133,10 +153,12 @@ public class EntityCleanupTask extends BukkitRunnable {
             }
         }
 
-        // Detect and mark duplicates
-        for (List<Entity> locationGroup : entitiesByLocation.values()) {
-            if (locationGroup.size() > 1) {
-                removedCount += removeDuplicateEntities(locationGroup, entitiesToRemove);
+        // Detect and mark duplicates only if enabled
+        if (ConfigManager.shouldCleanupDuplicateEntities()) {
+            for (List<Entity> locationGroup : entitiesByLocation.values()) {
+                if (locationGroup.size() > 1) {
+                    removedCount += removeDuplicateEntities(locationGroup, entitiesToRemove);
+                }
             }
         }
 
@@ -146,6 +168,10 @@ public class EntityCleanupTask extends BukkitRunnable {
                 if (entity.isValid()) {
                     entity.remove();
                     removedCount++;
+
+                    if (ConfigManager.isDebugEnabled()) {
+                        LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Removed entity: " + entity.getType() + " at " + entity.getLocation());
+                    }
                 }
             } catch (Exception e) {
                 if (ConfigManager.isDebugEnabled()) {
@@ -161,35 +187,96 @@ public class EntityCleanupTask extends BukkitRunnable {
 
     /**
      * Determines if an entity should be skipped during cleanup.
+     * FIXED: Proper protection logic with configuration support.
      */
     private boolean shouldSkipEntity(Entity entity) {
         // Never remove players
         if (entity instanceof Player) {
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping player: " + entity.getName());
+            }
             return true;
         }
 
-        // Skip entities with custom names (likely important)
-        if (entity.getCustomName() != null && !entity.getCustomName().isEmpty()) {
+        // Check if entity type is in protected list
+        List<String> protectedTypes = ConfigManager.getProtectedEntityTypes();
+        String entityTypeName = entity.getType().name().toUpperCase();
+        if (protectedTypes.stream().anyMatch(type -> type.equalsIgnoreCase(entityTypeName))) {
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping protected entity type: " + entityTypeName);
+            }
             return true;
         }
 
-        // Skip tamed animals
-        if (entity instanceof Tameable && ((Tameable) entity).isTamed()) {
-            return true;
+        // FIXED: Skip entities with custom names if configured (and they actually have names)
+        if (ConfigManager.shouldSkipNamedEntities()) {
+            String customName = entity.getCustomName();
+            if (customName != null && !customName.trim().isEmpty()) {
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping named entity: " + customName + " (" + entity.getType() + ")");
+                }
+                return true;
+            }
         }
 
-        // Skip leashed entities
-        if (entity instanceof LivingEntity && ((LivingEntity) entity).isLeashed()) {
-            return true;
+        // FIXED: Skip tamed animals if configured (and they are actually tamed)
+        if (ConfigManager.shouldSkipTamedAnimals() && entity instanceof Tameable) {
+            Tameable tameable = (Tameable) entity;
+            if (tameable.isTamed()) {
+                if (ConfigManager.isDebugEnabled()) {
+                    String ownerName = tameable.getOwner() != null ? tameable.getOwner().getName() : "Unknown";
+                    LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping tamed animal: " + entity.getType() + " owned by " + ownerName);
+                }
+                return true;
+            }
+        }
+
+        // FIXED: Skip leashed entities if configured (and they are actually leashed)
+        if (ConfigManager.shouldSkipLeashedEntities() && entity instanceof LivingEntity) {
+            LivingEntity living = (LivingEntity) entity;
+            if (living.isLeashed()) {
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping leashed entity: " + entity.getType());
+                }
+                return true;
+            }
         }
 
         // Skip entities in vehicles or with passengers
         if (entity.getVehicle() != null || !entity.getPassengers().isEmpty()) {
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping entity with vehicle/passengers: " + entity.getType());
+            }
             return true;
         }
 
-        // Skip persistent entities
-        if (entity instanceof LivingEntity && !((LivingEntity) entity).getRemoveWhenFarAway()) {
+        // Skip persistent entities (those that don't despawn naturally)
+        if (entity instanceof LivingEntity) {
+            LivingEntity living = (LivingEntity) entity;
+            if (!living.getRemoveWhenFarAway()) {
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping persistent entity: " + entity.getType());
+                }
+                return true;
+            }
+        }
+
+        // Skip entities with special AI or goals (villagers with trades, etc.)
+        if (entity instanceof Villager) {
+            Villager villager = (Villager) entity;
+            if (villager.getRecipes().size() > 0) {
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping villager with trades");
+                }
+                return true;
+            }
+        }
+
+        // Skip entities created by plugins (have custom metadata)
+        if (!entity.getMetadata("plugin-created").isEmpty()) {
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Skipping plugin-created entity: " + entity.getType());
+            }
             return true;
         }
 
@@ -223,7 +310,7 @@ public class EntityCleanupTask extends BukkitRunnable {
                 return true;
             }
 
-            // Check for entities at invalid Y coordinates
+            // Check for entities at invalid Y coordinates (below bedrock or above build limit)
             if (loc.getY() < -100 || loc.getY() > 1000) {
                 return true;
             }
@@ -265,10 +352,6 @@ public class EntityCleanupTask extends BukkitRunnable {
      * Checks if a vehicle has been abandoned for too long.
      */
     private boolean isAbandonedVehicle(Entity entity) {
-        if (!ConfigManager.shouldCleanupAbandonedVehicles()) {
-            return false;
-        }
-
         if (!(entity instanceof Vehicle)) {
             return false;
         }
@@ -278,10 +361,8 @@ public class EntityCleanupTask extends BukkitRunnable {
             return false;
         }
 
-        // Check how long the vehicle has been without passengers
-        // This is a simplified check - in a real implementation you might want to track this data
+        // Check if there are players nearby who might use it
         if (entity instanceof Boat || entity instanceof Minecart) {
-            // Check if there are players nearby who might use it
             List<Entity> nearbyEntities = entity.getNearbyEntities(50, 50, 50);
             boolean hasNearbyPlayers = nearbyEntities.stream().anyMatch(e -> e instanceof Player);
 
@@ -298,23 +379,28 @@ public class EntityCleanupTask extends BukkitRunnable {
      */
     private boolean isEmptyContainer(Entity entity) {
         if (entity instanceof ItemFrame) {
-            ItemFrame frame = (ItemFrame) entity;
             if (!ConfigManager.shouldCleanupEmptyItemFrames()) {
                 return false;
             }
+            ItemFrame frame = (ItemFrame) entity;
             ItemStack item = frame.getItem();
             return item == null || item.getType().isAir();
         }
 
         if (entity instanceof ArmorStand) {
-            ArmorStand stand = (ArmorStand) entity;
             if (!ConfigManager.shouldCleanupEmptyArmorStands()) {
                 return false;
             }
+            ArmorStand stand = (ArmorStand) entity;
 
             // Check if armor stand has any equipment
             boolean hasEquipment = false;
-            hasEquipment |= stand.getItemInHand() != null && !stand.getItemInHand().getType().isAir();
+
+            // Check main hand
+            ItemStack mainHand = stand.getItemInHand();
+            hasEquipment |= mainHand != null && !mainHand.getType().isAir();
+
+            // Check armor pieces
             hasEquipment |= stand.getHelmet() != null && !stand.getHelmet().getType().isAir();
             hasEquipment |= stand.getChestplate() != null && !stand.getChestplate().getType().isAir();
             hasEquipment |= stand.getLeggings() != null && !stand.getLeggings().getType().isAir();
@@ -345,7 +431,47 @@ public class EntityCleanupTask extends BukkitRunnable {
         for (Map.Entry<EntityType, List<Entity>> entry : byType.entrySet()) {
             List<Entity> typeGroup = entry.getValue();
             if (typeGroup.size() > 1) {
-                // Keep the first entity, remove the rest
+                // Sort by preference: keep named entities, tamed entities, entities with equipment, etc.
+                typeGroup.sort((e1, e2) -> {
+                    // Prefer named entities
+                    boolean e1HasName = e1.getCustomName() != null && !e1.getCustomName().trim().isEmpty();
+                    boolean e2HasName = e2.getCustomName() != null && !e2.getCustomName().trim().isEmpty();
+                    if (e1HasName && !e2HasName) return -1;
+                    if (!e1HasName && e2HasName) return 1;
+
+                    // Prefer tamed entities
+                    boolean e1Tamed = e1 instanceof Tameable && ((Tameable) e1).isTamed();
+                    boolean e2Tamed = e2 instanceof Tameable && ((Tameable) e2).isTamed();
+                    if (e1Tamed && !e2Tamed) return -1;
+                    if (!e1Tamed && e2Tamed) return 1;
+
+                    // Prefer entities with equipment
+                    if (e1 instanceof LivingEntity && e2 instanceof LivingEntity) {
+                        LivingEntity l1 = (LivingEntity) e1;
+                        LivingEntity l2 = (LivingEntity) e2;
+
+                        boolean e1HasEquipment = l1.getEquipment() != null &&
+                                (hasValidItem(l1.getEquipment().getItemInMainHand()) ||
+                                        hasValidItem(l1.getEquipment().getHelmet()) ||
+                                        hasValidItem(l1.getEquipment().getChestplate()) ||
+                                        hasValidItem(l1.getEquipment().getLeggings()) ||
+                                        hasValidItem(l1.getEquipment().getBoots()));
+
+                        boolean e2HasEquipment = l2.getEquipment() != null &&
+                                (hasValidItem(l2.getEquipment().getItemInMainHand()) ||
+                                        hasValidItem(l2.getEquipment().getHelmet()) ||
+                                        hasValidItem(l2.getEquipment().getChestplate()) ||
+                                        hasValidItem(l2.getEquipment().getLeggings()) ||
+                                        hasValidItem(l2.getEquipment().getBoots()));
+
+                        if (e1HasEquipment && !e2HasEquipment) return -1;
+                        if (!e1HasEquipment && e2HasEquipment) return 1;
+                    }
+
+                    return 0;
+                });
+
+                // Keep the first (most preferred) entity, remove the rest
                 for (int i = 1; i < typeGroup.size(); i++) {
                     entitiesToRemove.add(typeGroup.get(i));
                     markedForRemoval++;
@@ -358,6 +484,13 @@ public class EntityCleanupTask extends BukkitRunnable {
     }
 
     /**
+     * Helper method to check if an ItemStack is valid and not air.
+     */
+    private boolean hasValidItem(ItemStack item) {
+        return item != null && !item.getType().isAir();
+    }
+
+    /**
      * Generates a location key for grouping nearby entities.
      */
     private String getLocationKey(Location location) {
@@ -365,10 +498,13 @@ public class EntityCleanupTask extends BukkitRunnable {
             return "invalid";
         }
 
-        // Round to nearest block for grouping
-        int x = (int) Math.round(location.getX());
-        int y = (int) Math.round(location.getY());
-        int z = (int) Math.round(location.getZ());
+        // Use configured radius for duplicate detection
+        double radius = ConfigManager.getDuplicateDetectionRadius();
+
+        // Round to radius precision for grouping
+        int x = (int) Math.round(location.getX() / radius) * (int) radius;
+        int y = (int) Math.round(location.getY() / radius) * (int) radius;
+        int z = (int) Math.round(location.getZ() / radius) * (int) radius;
 
         return location.getWorld().getName() + "_" + x + "_" + y + "_" + z;
     }
@@ -377,6 +513,13 @@ public class EntityCleanupTask extends BukkitRunnable {
      * Checks if cleanup is enabled for a specific world.
      */
     private boolean isWorldEnabled(World world) {
+        // Check blacklisted worlds first
+        List<String> blacklistedWorlds = ConfigManager.getBlacklistedWorlds();
+        if (blacklistedWorlds.stream().anyMatch(w -> w.equalsIgnoreCase(world.getName()))) {
+            return false;
+        }
+
+        // Check enabled worlds
         List<String> enabledWorlds = ConfigManager.getEntityCleanupEnabledWorlds();
         return enabledWorlds.stream().anyMatch(w ->
                 w.equalsIgnoreCase("all") || w.equalsIgnoreCase(world.getName())
