@@ -2,6 +2,7 @@ package me.koyere.lagxpert;
 
 import me.koyere.lagxpert.commands.*;
 import me.koyere.lagxpert.config.WorldConfigManager;
+import me.koyere.lagxpert.config.ConfigMigrator;
 import me.koyere.lagxpert.gui.GUIManager;
 import me.koyere.lagxpert.listeners.*;
 import me.koyere.lagxpert.metrics.MetricsHandler;
@@ -19,6 +20,11 @@ import me.koyere.lagxpert.tasks.ItemCleanerTask;
 import me.koyere.lagxpert.utils.ChunkUtils;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
+import me.koyere.lagxpert.utils.PlatformDetector;
+import me.koyere.lagxpert.utils.SchedulerWrapper;
+import me.koyere.lagxpert.utils.BedrockPlayerUtils;
+import me.koyere.lagxpert.gui.BedrockCompatibleGUI;
+import me.koyere.lagxpert.system.SmartMobManager;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -54,34 +60,52 @@ public class LagXpert extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
+        // Phase 0: Platform Detection and Core Setup
+        initializePlatformDetection();
+        
         saveDefaultConfigurations();
+        
+        // NEW v2.2: Migrate configurations from older versions
+        ConfigMigrator.migrateConfigurations();
+        
         createPerWorldConfigurationStructure(); // NEW: Create per-world config structure
         loadPluginLogic();
         registerCommandsAndListeners();
         schedulePluginTasks();
+        
+        // Phase 1: Core systems
         initializeAdvancedSystems(); // Phase 1 systems
+        
+        // Phase 2: Advanced systems  
         initializeMonitoringSystems(); // Phase 2 systems
         initializeChunkManagementSystems(); // Phase 2 chunk management
+        initializeSmartMobManagement(); // NEW: Smart mob management
         initializeGUISystem(); // Phase 2 GUI system
         initializeMetrics(); // Initialize bStats and custom charts
 
-        getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully with Phase 1 & 2 optimizations, per-world configuration support, and GUI configuration system.");
+        getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully on " + 
+                        PlatformDetector.getPlatformSummary() + " with multi-platform compatibility.");
     }
 
     @Override
     public void onDisable() {
+        // Shutdown systems in reverse order of initialization
+        
         // Shutdown GUI system gracefully
         shutdownGUISystem();
 
         // Shutdown Phase 2 systems gracefully
+        shutdownSmartMobManagement();
         shutdownChunkManagementSystems();
         shutdownMonitoringSystems();
 
         // Shutdown Phase 1 systems gracefully
         shutdownAdvancedSystems();
 
-        // Cancel all tasks registered by this plugin to prevent potential errors
-        // or continued execution after the plugin is disabled.
+        // Cancel all tasks using cross-platform scheduler
+        SchedulerWrapper.cancelAllTasks();
+        
+        // Fallback: Cancel any remaining Bukkit tasks
         Bukkit.getScheduler().cancelTasks(this);
 
         getLogger().info("LagXpert Free disabled.");
@@ -450,6 +474,72 @@ public class LagXpert extends JavaPlugin {
     }
 
     /**
+     * Initializes platform detection and cross-platform compatibility systems.
+     * NEW: Phase 0 initialization for multi-platform support.
+     */
+    private void initializePlatformDetection() {
+        try {
+            // Detect server platform (Folia, Paper, Spigot, Bukkit)
+            PlatformDetector.detectPlatform();
+            
+            // Initialize platform-specific schedulers
+            if (PlatformDetector.isFolia()) {
+                SchedulerWrapper.initializeFoliaSchedulers();
+                getLogger().info("[LagXpert] Folia compatibility enabled - Using region-based scheduling");
+            } else {
+                getLogger().info("[LagXpert] Using standard Bukkit scheduler");
+            }
+            
+            // Initialize Bedrock player detection
+            BedrockPlayerUtils.initializeBedrockAPIs();
+            
+            // Initialize cross-platform GUI system
+            BedrockCompatibleGUI.initializeTemplates();
+            
+            if (ConfigManager.isDebugEnabled()) {
+                getLogger().info("[LagXpert] Platform detection completed:");
+                getLogger().info("  - Server Platform: " + PlatformDetector.getPlatformType().getDisplayName());
+                getLogger().info("  - Bedrock Support: " + (BedrockPlayerUtils.hasBedrockSupport() ? "Available" : "Not Available"));
+                getLogger().info("  - Scheduler Type: " + (PlatformDetector.isFolia() ? "Region-based (Folia)" : "Global (Bukkit)"));
+            }
+            
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Platform detection failed, using fallback compatibility: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Initializes the smart mob management system.
+     * NEW: Automatic mob removal with protection for important entities.
+     */
+    private void initializeSmartMobManagement() {
+        if (!ConfigManager.isMobsModuleEnabled() || !ConfigManager.isAutoMobRemovalEnabled()) {
+            if (ConfigManager.isDebugEnabled()) {
+                getLogger().info("[LagXpert] Smart mob management is disabled, skipping initialization.");
+            }
+            return;
+        }
+
+        try {
+            SmartMobManager.getInstance().startManagement();
+            getLogger().info("[LagXpert] Smart mob management system initialized.");
+            
+            if (ConfigManager.isDebugEnabled()) {
+                getLogger().info("[LagXpert] Smart mob management configuration:");
+                getLogger().info("  - Scan Interval: " + ConfigManager.getMobScanIntervalTicks() + " ticks");
+                getLogger().info("  - Mob Limit: " + ConfigManager.getMaxMobsPerChunk() + " per chunk");
+                getLogger().info("  - Protect Named: " + ConfigManager.shouldProtectNamedMobs());
+                getLogger().info("  - Protect Tamed: " + ConfigManager.shouldProtectTamedMobs());
+                getLogger().info("  - Protect Equipped: " + ConfigManager.shouldProtectEquippedMobs());
+            }
+            
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize smart mob management: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * Initializes Phase 2 smart chunk management systems.
      * NEW: Intelligent chunk loading/unloading with activity tracking and preloading.
      */
@@ -532,6 +622,19 @@ public class LagXpert extends JavaPlugin {
 
         } catch (Exception e) {
             getLogger().warning("[LagXpert] Error during GUI system shutdown: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Gracefully shuts down the smart mob management system.
+     * NEW: Ensures proper cleanup of mob management tasks and data.
+     */
+    private void shutdownSmartMobManagement() {
+        try {
+            SmartMobManager.getInstance().stopManagement();
+            getLogger().info("[LagXpert] Smart mob management shutdown completed.");
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error during smart mob management shutdown: " + e.getMessage());
         }
     }
 

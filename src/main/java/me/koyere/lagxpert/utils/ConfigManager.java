@@ -148,6 +148,27 @@ public class ConfigManager {
     private static boolean skipLeashedEntities;
     private static List<String> protectedEntityTypes;
     private static List<String> blacklistedWorlds;
+
+    // === SMART MOB MANAGER CONFIG ===
+    private static boolean autoMobRemovalEnabled;
+    private static int mobScanIntervalTicks;
+    private static boolean protectNamedMobs;
+    private static boolean protectTamedMobs;
+    private static boolean protectLeashedMobs;
+    private static boolean protectEquippedMobs;
+    private static List<String> protectedMobTypes;
+    private static List<String> mobManagementEnabledWorlds;
+    private static boolean notifyMobRemoval;
+    private static String mobRemovalNotificationMessage;
+
+    // === BEDROCK COMPATIBILITY CONFIG ===
+    private static boolean bedrockGUIOptimizationEnabled;
+    private static int bedrockMaxInventorySize;
+    private static boolean simplifyBedrockItemData;
+
+    // === PLATFORM DETECTION CONFIG ===
+    private static boolean autoDetectPlatform;
+    private static boolean forceBukkitScheduler;
     private static String entityCleanupCompleteMessage;
     private static boolean broadcastEntityCleanupCompletion;
     private static int entityCleanupBroadcastThreshold;
@@ -565,6 +586,34 @@ public class ConfigManager {
 
         // === GENERAL OPTIONS (from config.yml) ===
         debugEnabled = mainConfig.getBoolean("debug", false);
+
+        // === NEW v2.2: SMART MOB MANAGEMENT (from config.yml and mobs.yml) ===
+        autoMobRemovalEnabled = mainConfig.getBoolean("modules.auto-mob-removal", true);
+        mobScanIntervalTicks = mobsConfig.getInt("smart-management.scan-interval-ticks", 200);
+        protectNamedMobs = mobsConfig.getBoolean("smart-management.protection.named-mobs", true);
+        protectTamedMobs = mobsConfig.getBoolean("smart-management.protection.tamed-animals", true);
+        protectLeashedMobs = mobsConfig.getBoolean("smart-management.protection.leashed-entities", true);
+        protectEquippedMobs = mobsConfig.getBoolean("smart-management.protection.equipped-mobs", true);
+        protectedMobTypes = mobsConfig.getStringList("smart-management.protected-types");
+        if (protectedMobTypes.isEmpty()) {
+            protectedMobTypes = java.util.Arrays.asList("WITHER", "ENDER_DRAGON", "VILLAGER", "IRON_GOLEM");
+        }
+        mobManagementEnabledWorlds = mobsConfig.getStringList("smart-management.enabled-worlds");
+        if (mobManagementEnabledWorlds.isEmpty()) {
+            mobManagementEnabledWorlds = java.util.Arrays.asList("all");
+        }
+        notifyMobRemoval = mobsConfig.getBoolean("smart-management.notifications.enabled", true);
+        mobRemovalNotificationMessage = mobsConfig.getString("smart-management.notifications.message", 
+            "&e[LagXpert] &7Removed &c{removed} &7excess mobs. &8({original} → {remaining}, limit: {limit})");
+
+        // === NEW v2.2: BEDROCK COMPATIBILITY (from config.yml) ===
+        bedrockGUIOptimizationEnabled = mainConfig.getBoolean("bedrock-compatibility.gui.optimize-for-bedrock", true);
+        bedrockMaxInventorySize = mainConfig.getInt("bedrock-compatibility.gui.max-inventory-size", 36);
+        simplifyBedrockItemData = mainConfig.getBoolean("bedrock-compatibility.gui.simplify-item-data", true);
+
+        // === NEW v2.2: PLATFORM DETECTION (from config.yml) ===
+        autoDetectPlatform = mainConfig.getBoolean("platform-detection.auto-detect", true);
+        forceBukkitScheduler = mainConfig.getBoolean("platform-detection.force-bukkit-scheduler", false);
 
         // === INITIALIZE PER-WORLD CONFIGURATION SYSTEM ===
         WorldConfigManager.initialize();
@@ -1276,6 +1325,27 @@ public class ConfigManager {
     public static boolean isStorageModuleEnabled() { return storageModuleEnabled; }
     public static boolean isRedstoneControlModuleEnabled() { return redstoneControlModuleEnabled; }
     public static boolean isAutoChunkScanModuleEnabled() { return autoChunkScanModuleEnabled; }
+    
+    // --- Getters for Smart Mob Manager ---
+    public static boolean isAutoMobRemovalEnabled() { return autoMobRemovalEnabled; }
+    public static int getMobScanIntervalTicks() { return mobScanIntervalTicks; }
+    public static boolean shouldProtectNamedMobs() { return protectNamedMobs; }
+    public static boolean shouldProtectTamedMobs() { return protectTamedMobs; }
+    public static boolean shouldProtectLeashedMobs() { return protectLeashedMobs; }
+    public static boolean shouldProtectEquippedMobs() { return protectEquippedMobs; }
+    public static List<String> getProtectedMobTypes() { return protectedMobTypes; }
+    public static List<String> getMobManagementEnabledWorlds() { return mobManagementEnabledWorlds; }
+    public static boolean shouldNotifyMobRemoval() { return notifyMobRemoval; }
+    public static String getMobRemovalNotificationMessage() { return mobRemovalNotificationMessage; }
+    
+    // --- Getters for Bedrock Compatibility ---
+    public static boolean isBedrockGUIOptimizationEnabled() { return bedrockGUIOptimizationEnabled; }
+    public static int getBedrockMaxInventorySize() { return bedrockMaxInventorySize; }
+    public static boolean shouldSimplifyBedrockItemData() { return simplifyBedrockItemData; }
+    
+    // --- Getters for Platform Detection ---
+    public static boolean shouldAutoDetectPlatform() { return autoDetectPlatform; }
+    public static boolean shouldForceBukkitScheduler() { return forceBukkitScheduler; }
     public static boolean isItemCleanerModuleEnabled() { return itemCleanerModuleEnabled; }
     public static boolean isEntityCleanupModuleEnabled() { return entityCleanupModuleEnabled; }
 

@@ -1,6 +1,69 @@
-# LagXpert - Mob Limits Configuration
+# LagXpert v2.2 - Mob Management Configuration
 
 # 🧟 Maximum number of living entities (e.g., mobs, animals) allowed per chunk
 # If the number exceeds this value, spawning is blocked and players are notified (if enabled).
+# In v2.2, excess mobs are also automatically removed using smart management.
 limits:
   mobs-per-chunk: 40
+
+# 🤖 NEW v2.2: Smart Mob Management System
+# Automatically removes excess mobs while protecting important entities
+smart-management:
+  # Enable automatic removal of excess mobs
+  enabled: true
+  
+  # How often to scan chunks for excess mobs (in ticks, 20 ticks = 1 second)
+  scan-interval-ticks: 200
+  
+  # Maximum mobs to remove per tick per chunk (prevents lag spikes)
+  max-mobs-per-tick-removal: 10
+  
+  # Cooldown between processing the same chunk (in seconds)
+  chunk-processing-cooldown-seconds: 30
+  
+  # Entity protection settings - these entities will NEVER be removed
+  protection:
+    # Protect entities with custom names (player-named pets, etc.)
+    named-mobs: true
+    
+    # Protect tamed animals (dogs, cats, horses, parrots, etc.)
+    tamed-animals: true
+    
+    # Protect entities on a leash
+    leashed-entities: true
+    
+    # Protect mobs with equipment (armor, tools, etc.)
+    equipped-mobs: true
+    
+    # Protect entities created by other plugins (with metadata)
+    plugin-entities: true
+    
+    # Protect villagers that have active trades
+    villagers-with-trades: true
+  
+  # Specific entity types that are always protected (in addition to the above rules)
+  protected-types:
+    - "WITHER"
+    - "ENDER_DRAGON"
+    - "VILLAGER"
+    - "IRON_GOLEM"
+    - "SNOW_GOLEM"
+    - "SHULKER"
+  
+  # Notification settings when mobs are removed
+  notifications:
+    # Enable notifications to players in the chunk
+    enabled: true
+    
+    # Message sent to players (placeholders: {removed}, {original}, {remaining}, {limit})
+    message: "&e[LagXpert] &7Removed &c{removed} &7excess mobs from this chunk. &8({original} → {remaining}, limit: {limit})"
+    
+    # Permission required to receive notifications
+    permission: "lagxpert.notifications.mob-removal"
+  
+  # Worlds where smart mob management is enabled
+  enabled-worlds:
+    - "all"  # Use "all" for all worlds, or list specific world names
+    # - "world"
+    # - "world_nether"
+    # - "world_the_end"

@@ -1,24 +1,35 @@
-# 🔧 LagXpert Free
+# 🔧 LagXpert Free v2.2
 
-**LagXpert Free** is a modular and performance-oriented plugin designed to monitor and mitigate lag sources in Minecraft servers, with a focus on **chunk-based optimization** and **player education**.
+**LagXpert Free** is an advanced lag prevention plugin with **multi-platform support** (Folia/Paper/Spigot/Bukkit), **Bedrock compatibility**, and **intelligent optimization systems**. Designed to actively prevent and optimize lag sources rather than just detect them.
 
-![Version](https://img.shields.io/badge/version-1.3-blue)
+![Version](https://img.shields.io/badge/version-2.2-blue)
+![Platforms](https://img.shields.io/badge/platforms-Folia%20%7C%20Paper%20%7C%20Spigot%20%7C%20Bukkit-green)
+![Bedrock](https://img.shields.io/badge/bedrock-compatible-orange)
 ![bStats](https://img.shields.io/badge/bStats-enabled-brightgreen)
 
 ---
 
 ## 📦 Features
 
-- ✅ Chunk-level inspections
-- ✅ Hopper, chest, and mob limits per chunk
+### 🚀 **NEW in v2.2: Advanced Optimization**
+- ✅ **Smart mob management** - Automatically removes excess mobs while protecting important ones
+- ✅ **Multi-platform support** - Optimized for Folia, Paper, Spigot, and Bukkit
+- ✅ **Bedrock compatibility** - Full support for Bedrock players via Geyser/Floodgate
+- ✅ **Intelligent protection** - Preserves named, tamed, equipped, and plugin entities
+- ✅ **Performance-first design** - Zero lag added, maximum optimization gained
+
+### 🎯 **Core Features**
+- ✅ Chunk-level inspections with real-time optimization
+- ✅ Hopper, chest, and mob limits per chunk with automatic enforcement
 - ✅ Redstone control system to prevent laggy loops
 - ✅ Item cleaner with warning & recovery (Abyss system)
 - ✅ Modular YAML configuration for each system
-- ✅ Customizable messages in `messages.yml`
+- ✅ Cross-platform GUI optimization (Java & Bedrock)
+- ✅ Customizable messages with platform detection
 - ✅ Permissions for admin and player bypass
-- ✅ Automatic scan task (configurable interval)
-- ✅ bStats integration
-- ✅ Public API: `ChunkOverloadEvent`
+- ✅ Automatic scan task with intelligent scheduling
+- ✅ bStats integration with enhanced metrics
+- ✅ Public API: `ChunkOverloadEvent` and smart management hooks
 
 ---
 

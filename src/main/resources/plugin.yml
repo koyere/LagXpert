@@ -3,9 +3,9 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 2.1.1
+version: 2.2
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
-description: Monitors and controls server lag sources such as chunk limits, redstone, entities, and storage blocks.
+description: Advanced lag prevention plugin with multi-platform support (Folia/Paper/Spigot), Bedrock compatibility, and intelligent optimization systems.
 author: Koyere
 authors: [Koyere]
 website: https://www.spigotmc.org/resources/lagxpert-free.124725/

@@ -6,10 +6,10 @@
 
     <groupId>me.koyere</groupId>
     <artifactId>LagXpert</artifactId>
-    <version>2.1.1</version> <packaging>jar</packaging>
+    <version>2.2</version> <packaging>jar</packaging>
 
     <name>LagXpert</name>
-    <description>Free plugin to control lag sources on Minecraft servers</description>
+    <description>Advanced lag prevention plugin with multi-platform support and smart optimization</description>
     <url>https://github.com/koyere/LagXpert</url>
 
     <properties>

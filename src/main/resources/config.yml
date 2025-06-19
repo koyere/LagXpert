@@ -1,6 +1,13 @@
-# LagXpert - General Configuration
+# LagXpert v2.2 - General Configuration
+# Multi-platform support: Folia, Paper, Spigot, Bukkit
+# Bedrock compatibility: Geyser & Floodgate integration
+# Smart optimization: Intelligent mob management
+#
 # This is the main configuration file for LagXpert.
 # Use this file to enable or disable core functionalities and set global options.
+
+# Configuration version (DO NOT MODIFY)
+config-version: "2.2"
 
 # 🧩 Modules Activation
 # Activate or deactivate main plugin functionalities.
@@ -56,6 +63,21 @@ modules:
   # are in 'chunks.yml'.
   chunk-management: true
 
+  # NEW v2.2: Enables intelligent mob management with automatic removal of excess mobs.
+  # Protects named, tamed, equipped, and plugin-created entities while optimizing performance.
+  # Smart removal prioritizes less important mobs and maintains server performance.
+  auto-mob-removal: true
+
+  # NEW v2.2: Enables multi-platform compatibility detection and optimization.
+  # Automatically detects Folia, Paper, Spigot, or Bukkit and uses appropriate scheduling.
+  # Provides optimal performance across all server platforms.
+  platform-detection: true
+
+  # NEW v2.2: Enables Bedrock Edition player compatibility features.
+  # Integrates with Geyser and Floodgate for cross-platform player support.
+  # Optimizes GUIs and features for Bedrock players.
+  bedrock-compatibility: true
+
 # 🧠 Debug Mode
 # If true, LagXpert will output additional information to the server console,
 # which can be helpful for diagnosing issues or understanding plugin behavior.
@@ -108,3 +130,95 @@ performance:
 
 # Removed 'permissions.bypass-enabled' as it was not implemented.
 # Bypass functionality is handled by individual Bukkit permissions (e.g., lagxpert.bypass.mobs).
+
+# 🌐 NEW v2.2: Platform Detection & Multi-Platform Support
+# Automatically detects and optimizes for different server platforms
+platform-detection:
+  # Enable automatic platform detection (Folia, Paper, Spigot, Bukkit)
+  auto-detect: true
+  
+  # Force use of Bukkit scheduler even on Folia (not recommended)
+  force-bukkit-scheduler: false
+  
+  # Show detailed platform information in console
+  debug-platform-info: false
+  
+  # Folia-specific optimizations
+  folia:
+    # Use region-based scheduler for better performance on Folia
+    use-region-scheduler: true
+    # Use async scheduler for background tasks
+    use-async-scheduler: true
+    # Optimize chunk operations for region-based processing
+    optimize-chunk-operations: true
+
+# 🎮 NEW v2.2: Bedrock Edition Compatibility
+# Cross-platform support for Java and Bedrock players
+bedrock-compatibility:
+  # Enable Bedrock player detection and optimization
+  enabled: true
+  
+  # Automatically detect Bedrock players using Geyser/Floodgate
+  auto-detect-players: true
+  
+  # Cache player platform type for performance
+  cache-player-platform: true
+  
+  # GUI optimizations for Bedrock players
+  gui:
+    # Enable Bedrock-specific GUI optimizations
+    optimize-for-bedrock: true
+    # Maximum inventory size for Bedrock players (safer)
+    max-inventory-size: 36
+    # Simplify item data that may cause issues on Bedrock
+    simplify-item-data: true
+    # Fallback to chat commands if GUI fails
+    fallback-to-chat: true
+    # Use Bedrock-safe materials in GUIs
+    bedrock-safe-materials: true
+  
+  # Integration with Bedrock compatibility plugins
+  integrations:
+    # Enable Geyser integration
+    geyser: true
+    # Enable Floodgate integration
+    floodgate: true
+    # Automatically detect and integrate with available plugins
+    auto-detect-plugins: true
+
+# 🤖 NEW v2.2: Smart Mob Management
+# Intelligent mob removal system with comprehensive protection
+smart-mob-management:
+  # Enable smart mob management system
+  enabled: true
+  
+  # Performance settings to prevent lag
+  performance:
+    # Maximum chunks to process per server tick (prevents lag spikes)
+    max-chunks-per-tick: 5
+    # Maximum mobs to remove per chunk per tick (gradual removal)
+    max-removals-per-chunk-per-tick: 10
+    # Cooldown between processing the same chunk (seconds)
+    chunk-cooldown-seconds: 30
+  
+  # Entity removal priority system (lower number = removed first)
+  priority:
+    # Farm animals (cows, pigs, chickens, sheep)
+    farm-animals: 1
+    # Common hostile mobs (zombies, skeletons, spiders)
+    hostile-mobs: 2
+    # Neutral mobs (endermen, wolves)
+    neutral-mobs: 3
+    # Valuable entities (villagers, horses)
+    valuable-entities: 5
+    # Boss entities (never remove these)
+    boss-entities: 10
+  
+  # Debug settings for troubleshooting
+  debug:
+    # Log which mobs are removed and why
+    log-removals: false
+    # Log which mobs are protected and why
+    log-protections: false
+    # Log performance statistics
+    log-performance: false
