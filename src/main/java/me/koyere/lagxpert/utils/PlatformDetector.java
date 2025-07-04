@@ -86,20 +86,39 @@ public class PlatformDetector {
      */
     private static boolean checkFoliaSupport() {
         try {
-            // Check for Folia's RegionScheduler
+            // First check if we have the Folia classes
             Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
             hasRegionScheduler = true;
             
-            // Check for AsyncScheduler 
             Class.forName("io.papermc.paper.threadedregions.scheduler.AsyncScheduler");
             hasAsyncScheduler = true;
             
-            // Check for GlobalRegionScheduler
             Class.forName("io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler");
             hasGlobalRegionScheduler = true;
             
-            // All Folia classes found
-            return true;
+            // Now check if this is actually Folia or just Paper with Folia classes
+            // Folia has a specific method that Paper doesn't implement the same way
+            String serverVersion = Bukkit.getVersion().toLowerCase();
+            String serverName = Bukkit.getName().toLowerCase();
+            
+            // Check for Folia-specific identifiers
+            if (serverVersion.contains("folia") || serverName.contains("folia")) {
+                return true;
+            }
+            
+            // Additional check: Try to access Folia-specific runtime behavior
+            try {
+                // This method exists in Folia but behaves differently in Paper
+                Class<?> serverClass = Class.forName("org.bukkit.Bukkit");
+                java.lang.reflect.Method method = serverClass.getMethod("getRegionScheduler");
+                Object scheduler = method.invoke(null);
+                
+                // If we got here and scheduler is not null, it's likely real Folia
+                return scheduler != null && scheduler.getClass().getName().contains("folia");
+            } catch (Exception e) {
+                // If this fails, it's probably Paper with Folia classes but not real Folia
+                return false;
+            }
             
         } catch (ClassNotFoundException e) {
             return false;

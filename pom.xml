@@ -6,7 +6,7 @@
 
     <groupId>me.koyere</groupId>
     <artifactId>LagXpert</artifactId>
-    <version>2.2</version> <packaging>jar</packaging>
+    <version>2.3</version> <packaging>jar</packaging>
 
     <name>LagXpert</name>
     <description>Advanced lag prevention plugin with multi-platform support and smart optimization</description>

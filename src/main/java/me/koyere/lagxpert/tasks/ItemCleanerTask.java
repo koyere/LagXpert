@@ -3,6 +3,7 @@ package me.koyere.lagxpert.tasks;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.system.AbyssManager;
 import me.koyere.lagxpert.system.AbyssTracker; // For bStats
+import me.koyere.lagxpert.system.RecentlyBrokenBlocksTracker;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -21,6 +22,9 @@ import java.util.stream.Collectors;
  * Supports exclusions and per-world filtering by fetching configuration from ConfigManager.
  * Integrates with Abyss recovery system and handles its own warning cycle.
  * Fixed exclusion logic to properly handle excluded items.
+ * 
+ * Enhanced with recently broken blocks tracking to provide grace periods
+ * for items that players just broke but haven't collected yet.
  */
 public class ItemCleanerTask extends BukkitRunnable {
 
@@ -152,6 +156,22 @@ public class ItemCleanerTask extends BukkitRunnable {
                 if (itemStack.hasItemMeta() && itemStack.getItemMeta().hasEnchants()) {
                     if (ConfigManager.isDebugEnabled()) {
                         LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Skipping enchanted item: " + materialName);
+                    }
+                    continue;
+                }
+                
+                // ENHANCED: Check if this item is from a recently broken block (grace period)
+                if (RecentlyBrokenBlocksTracker.hasRecentlyBrokenBlock(itemEntity.getLocation())) {
+                    if (ConfigManager.isDebugEnabled()) {
+                        RecentlyBrokenBlocksTracker.BrokenBlockInfo blockInfo = 
+                            RecentlyBrokenBlocksTracker.getBrokenBlockInfo(itemEntity.getLocation());
+                        if (blockInfo != null) {
+                            long remainingMs = blockInfo.getRemainingGracePeriodMs();
+                            LagXpert.getInstance().getLogger().info(
+                                "[ItemCleanerTask] Skipping recently broken item: " + materialName + 
+                                " (grace period: " + (remainingMs / 1000) + "s remaining)"
+                            );
+                        }
                     }
                     continue;
                 }

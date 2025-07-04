@@ -18,6 +18,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockBreakEvent;
 
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -152,13 +153,15 @@ public class StorageListener implements Listener {
                     }
                 }
 
-                // Block was placed successfully, invalidate cache
+                // Block was placed successfully, update atomic counters and invalidate cache
+                updateCountersAfterPlacement(chunk, config);
                 invalidateChunkCache(chunk);
 
                 // Optionally trigger async re-analysis of the chunk for future cache hits
                 scheduleAsyncReanalysis(chunk);
             } else {
-                // Block was placed successfully, invalidate cache
+                // Block was placed successfully, update atomic counters and invalidate cache
+                updateCountersAfterPlacement(chunk, config);
                 invalidateChunkCache(chunk);
 
                 // Optionally trigger async re-analysis of the chunk for future cache hits
@@ -169,9 +172,25 @@ public class StorageListener implements Listener {
 
     /**
      * Gets the current count of a specific block type in a chunk using cache-optimized methods.
+     * Now uses atomic counters for better performance and accuracy.
      */
     private int getCurrentCount(Chunk chunk, BlockLimitConfig config) {
-        // Check cache first for complete data
+        // For TNT and other high-frequency blocks, use atomic counters for best performance
+        if (config.getMaterial() == Material.TNT || 
+            config.getMaterial() == Material.PISTON || 
+            config.getMaterial() == Material.STICKY_PISTON) {
+            
+            if (config.getOverloadCause().equals("pistons")) {
+                // For pistons, we need both regular and sticky pistons
+                return ChunkDataCache.getAtomicCounter(chunk, Material.PISTON) +
+                       ChunkDataCache.getAtomicCounter(chunk, Material.STICKY_PISTON);
+            } else {
+                // Single material atomic counter
+                return ChunkDataCache.getAtomicCounter(chunk, config.getMaterial());
+            }
+        }
+        
+        // Check cache first for complete data (for other materials)
         ChunkDataCache.ChunkData cachedData = ChunkDataCache.getCachedData(chunk);
         if (cachedData != null && cachedData.isComplete()) {
             // Use cached data for counting
@@ -283,5 +302,64 @@ public class StorageListener implements Listener {
 
     private void fireChunkOverloadEvent(Chunk chunk, String cause) {
         Bukkit.getPluginManager().callEvent(new ChunkOverloadEvent(chunk, cause));
+    }
+    
+    /**
+     * Updates atomic counters after a block is successfully placed.
+     * This maintains accurate real-time counts for performance-critical materials.
+     */
+    private void updateCountersAfterPlacement(Chunk chunk, BlockLimitConfig config) {
+        // Update atomic counters for tracked materials
+        if (config.getMaterial() == Material.TNT || 
+            config.getMaterial() == Material.PISTON || 
+            config.getMaterial() == Material.STICKY_PISTON) {
+            
+            ChunkDataCache.incrementAtomicCounter(chunk, config.getMaterial());
+            
+            if (ConfigManager.isDebugEnabled()) {
+                int newCount = ChunkDataCache.getAtomicCounter(chunk, config.getMaterial());
+                LagXpert.getInstance().getLogger().info(
+                    "[StorageListener] Atomic counter updated for " + config.getMaterial() + 
+                    " in chunk " + chunk.getX() + "," + chunk.getZ() + 
+                    ". New count: " + newCount
+                );
+            }
+        }
+    }
+    
+    /**
+     * Handles block breaking events to maintain accurate atomic counters.
+     * This prevents counters from becoming out of sync when blocks are broken.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (!ConfigManager.isStorageModuleEnabled()) {
+            return;
+        }
+        
+        Block block = event.getBlock();
+        Material type = block.getType();
+        Chunk chunk = block.getChunk();
+        
+        // Check if this is a tracked material
+        BlockLimitConfig config = limitedBlocks.get(type);
+        if (config != null) {
+            // Update atomic counters for tracked materials
+            if (type == Material.TNT || type == Material.PISTON || type == Material.STICKY_PISTON) {
+                ChunkDataCache.decrementAtomicCounter(chunk, type);
+                
+                if (ConfigManager.isDebugEnabled()) {
+                    int newCount = ChunkDataCache.getAtomicCounter(chunk, type);
+                    LagXpert.getInstance().getLogger().info(
+                        "[StorageListener] Atomic counter decremented for " + type + 
+                        " in chunk " + chunk.getX() + "," + chunk.getZ() + 
+                        ". New count: " + newCount
+                    );
+                }
+            }
+            
+            // Always invalidate cache when blocks are broken
+            invalidateChunkCache(chunk);
+        }
     }
 }

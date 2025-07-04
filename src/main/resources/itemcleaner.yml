@@ -46,6 +46,38 @@ item-cleaner:
   #   - "DIAMOND_PICKAXE"
   #   - "NETHERITE_SWORD"
   excluded-items: []
+  
+  # Enhanced broken block tracking settings
+  # This system tracks when players break blocks and provides a grace period
+  # during which dropped items from those blocks won't be cleaned up
+  broken-block-tracking:
+    # Enable/disable the broken block tracking system
+    enabled: true
+    
+    # Default grace period (in seconds) for items from broken blocks
+    # Items dropped from recently broken blocks won't be cleaned for this duration
+    default-grace-period-seconds: 180  # 3 minutes
+    
+    # Custom grace periods for specific valuable materials (in seconds)
+    # These override the default grace period for specific block types
+    custom-grace-periods:
+      # Extremely valuable blocks get extended grace periods
+      DIAMOND_ORE: 300          # 5 minutes
+      EMERALD_ORE: 300
+      ANCIENT_DEBRIS: 300
+      
+      # Valuable ores get medium grace periods
+      GOLD_ORE: 240            # 4 minutes
+      IRON_ORE: 240
+      COAL_ORE: 240
+      
+      # Storage blocks get very long grace periods (players need time to sort)
+      CHEST: 600               # 10 minutes
+      TRAPPED_CHEST: 600
+      BARREL: 600
+      
+      # Spawners get maximum grace period (extremely rare and valuable)
+      SPAWNER: 900             # 15 minutes
 
   warning:
     # Enable or disable the broadcast warning message before items are automatically cleared.

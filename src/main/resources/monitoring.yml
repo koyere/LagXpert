@@ -110,6 +110,9 @@ alerts:
     players: true
     # Required permission for players to receive monitoring alerts
     player-permission: "lagxpert.monitoring.alerts"
+    # Skip player alerts when no players are online (reduces spam)
+    # Console alerts will still be sent if enabled above
+    skip-when-no-players-online: true
 
   # Alert cooldown system (prevents spam)
   cooldown:

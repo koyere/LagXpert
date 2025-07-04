@@ -3,7 +3,7 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 2.2
+version: 2.3
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
 description: Advanced lag prevention plugin with multi-platform support (Folia/Paper/Spigot), Bedrock compatibility, and intelligent optimization systems.
 author: Koyere

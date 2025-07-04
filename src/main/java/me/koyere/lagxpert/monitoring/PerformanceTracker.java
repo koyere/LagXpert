@@ -441,15 +441,19 @@ public class PerformanceTracker extends BukkitRunnable {
 
     /**
      * Broadcasts an alert to console and eligible players.
+     * Enhanced to check if players are online before sending performance alerts.
      */
     private void broadcastAlert(String message) {
+        // Check if there are any players online
+        boolean hasPlayersOnline = !Bukkit.getOnlinePlayers().isEmpty();
+        
         // Send to console if enabled
         if (ConfigManager.shouldSendAlertsToConsole()) {
             LagXpert.getInstance().getLogger().warning(MessageManager.color(message).replaceAll("§[0-9a-fk-or]", ""));
         }
 
-        // Send to players if enabled
-        if (ConfigManager.shouldSendAlertsToPlayers()) {
+        // Send to players if enabled and there are players online
+        if (ConfigManager.shouldSendAlertsToPlayers() && hasPlayersOnline) {
             String permission = ConfigManager.getPlayerAlertPermission();
             String coloredMessage = MessageManager.color(message);
 
@@ -458,6 +462,12 @@ public class PerformanceTracker extends BukkitRunnable {
                     player.sendMessage(coloredMessage);
                 }
             }
+        } else if (!hasPlayersOnline && ConfigManager.isDebugEnabled()) {
+            // Log when alerts are skipped due to no players online
+            LagXpert.getInstance().getLogger().info(
+                "[PerformanceTracker] Skipped player alert (no players online): " + 
+                MessageManager.color(message).replaceAll("§[0-9a-fk-or]", "")
+            );
         }
     }
 

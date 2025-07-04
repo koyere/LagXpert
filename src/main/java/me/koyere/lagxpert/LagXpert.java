@@ -367,6 +367,11 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isMobsModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new EntityListener(), this);
         }
+        
+        // Register ItemCleanerListener for enhanced broken block tracking
+        if (ConfigManager.isItemCleanerModuleEnabled()) {
+            getServer().getPluginManager().registerEvents(new ItemCleanerListener(), this);
+        }
     }
 
     /**
