@@ -77,6 +77,23 @@ public class StorageListener implements Listener {
         addLimitedBlock(Material.DROPPER, ConfigManager::getMaxDroppersPerChunk, "droppers", "limits.dropper", "droppers", true);
         addLimitedBlock(Material.DISPENSER, ConfigManager::getMaxDispensersPerChunk, "dispensers", "limits.dispenser", "dispensers", true);
         addLimitedBlock(Material.SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        // Add all 16 colored shulker boxes
+        addLimitedBlock(Material.WHITE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.ORANGE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.MAGENTA_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIGHT_BLUE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.YELLOW_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIME_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.PINK_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.GRAY_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIGHT_GRAY_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.CYAN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.PURPLE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BLUE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BROWN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.GREEN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.RED_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BLACK_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
         addLimitedBlock(Material.TNT, ConfigManager::getMaxTntPerChunk, "tnt", "limits.tnt", "tnt", false);
         addLimitedBlock(Material.PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", "limits.piston", "pistons", false);
         addLimitedBlock(Material.STICKY_PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", "limits.piston", "pistons", false);
@@ -117,18 +134,21 @@ public class StorageListener implements Listener {
 
             // Get current count using cache-optimized methods
             int currentCount = getCurrentCount(chunk, config);
-            int limit = config.getLimitSupplier().get();
-            int newCount = currentCount + 1;
+            int limit = getEffectiveLimit(player, config);
 
-            if (newCount > limit && limit > 0) {
+            // Check if we're already at the limit (fix off-by-one error)
+            if (currentCount >= limit && limit > 0) {
                 event.setCancelled(true);
                 fireChunkOverloadEvent(chunk, config.getOverloadCause() + "_limit_exceeded_placement");
 
                 if (ConfigManager.isAlertsModuleEnabled() && shouldShowLimitReachedAlert(config.getMaterial())) {
-                    // Generate a unique key for this alert: type_limit_chunk_world_x_z
-                    String alertKey = AlertCooldownManager.generateAlertKey(config.getOverloadCause() + "_limit", chunk);
-                    if (AlertCooldownManager.canSendAlert(player, alertKey)) {
-                        player.sendMessage(MessageManager.getPrefixedMessage(config.getLimitMessageKey()));
+                    // Only send alerts to players with permission to receive them
+                    if (player.hasPermission("lagxpert.alerts.receive") || player.hasPermission("lagxpert.alerts.blocks")) {
+                        // Generate a unique key for this alert: type_limit_chunk_world_x_z
+                        String alertKey = AlertCooldownManager.generateAlertKey(config.getOverloadCause() + "_limit", chunk);
+                        if (AlertCooldownManager.canSendAlert(player, alertKey)) {
+                            MessageManager.sendRestrictionMessage(player, config.getLimitMessageKey());
+                        }
                     }
                 }
 
@@ -136,20 +156,23 @@ public class StorageListener implements Listener {
                     LagXpert.getInstance().getLogger().info(
                             "Cancelled placement of " + type + " by " + player.getName() + " at chunk " +
                                     chunk.getX() + "," + chunk.getZ() + ". Current in chunk: " + currentCount +
-                                    ", New count would be: " + newCount + ", Limit: " + limit
+                                    ", Limit: " + limit
                     );
                 }
 
-            } else if (newCount >= (int) (limit * 0.8) && limit > 0) { // Near limit warning
+            } else if ((currentCount + 1) >= (int) (limit * 0.8) && limit > 0) { // Near limit warning
                 if (ConfigManager.isAlertsModuleEnabled() && shouldShowNearLimitWarning(config.getMaterial())) {
-                    // Generate a unique key for this alert: type_near_limit_chunk_world_x_z
-                    String alertKey = AlertCooldownManager.generateAlertKey(config.getOverloadCause() + "_near_limit", chunk);
-                    if (AlertCooldownManager.canSendAlert(player, alertKey)) {
-                        Map<String, Object> placeholders = new HashMap<>();
-                        placeholders.put("type", type.toString().toLowerCase().replace("_", " "));
-                        placeholders.put("used", String.valueOf(newCount));
-                        placeholders.put("max", String.valueOf(limit));
-                        player.sendMessage(MessageManager.getPrefixedFormattedMessage(config.getNearLimitMessageKey(), placeholders));
+                    // Only send alerts to players with permission to receive them
+                    if (player.hasPermission("lagxpert.alerts.receive") || player.hasPermission("lagxpert.alerts.blocks")) {
+                        // Generate a unique key for this alert: type_near_limit_chunk_world_x_z
+                        String alertKey = AlertCooldownManager.generateAlertKey(config.getOverloadCause() + "_near_limit", chunk);
+                        if (AlertCooldownManager.canSendAlert(player, alertKey)) {
+                            Map<String, Object> placeholders = new HashMap<>();
+                            placeholders.put("type", type.toString().toLowerCase().replace("_", " "));
+                            placeholders.put("used", String.valueOf(currentCount + 1));
+                            placeholders.put("max", String.valueOf(limit));
+                            MessageManager.sendFormattedRestrictionMessage(player, config.getNearLimitMessageKey(), placeholders);
+                        }
                     }
                 }
 
@@ -253,6 +276,61 @@ public class StorageListener implements Listener {
                 }
             }, 20L); // Wait 1 second before re-analyzing to allow for multiple block placements
         }
+    }
+
+    /**
+     * Gets the effective limit for a player, considering custom permission-based limits.
+     * Priority: Custom permission limit > Default config limit
+     *
+     * @param player The player placing the block
+     * @param config The block configuration
+     * @return The effective limit for this player
+     */
+    private int getEffectiveLimit(Player player, BlockLimitConfig config) {
+        // Get the permission key for this material type
+        String permissionPrefix = "lagxpert.limits." + config.getOverloadCause().replace("_", ".");
+        
+        // Check for custom limit permissions (e.g., lagxpert.limits.hoppers.15)
+        int customLimit = getCustomLimitFromPermissions(player, permissionPrefix);
+        if (customLimit > 0) {
+            return customLimit;
+        }
+        
+        // Fall back to default config limit
+        return config.getLimitSupplier().get();
+    }
+
+    /**
+     * Extracts custom limit from player permissions.
+     * Looks for permissions like "lagxpert.limits.hoppers.25" and returns the highest number found.
+     *
+     * @param player The player to check permissions for
+     * @param permissionPrefix The permission prefix (e.g., "lagxpert.limits.hoppers")
+     * @return The highest custom limit found, or 0 if none
+     */
+    private int getCustomLimitFromPermissions(Player player, String permissionPrefix) {
+        int highestLimit = 0;
+        
+        // Check all permissions the player has
+        for (org.bukkit.permissions.PermissionAttachmentInfo permInfo : player.getEffectivePermissions()) {
+            String permission = permInfo.getPermission();
+            
+            // Check if this permission matches our pattern
+            if (permission.startsWith(permissionPrefix + ".") && permInfo.getValue()) {
+                // Extract the number part
+                String numberPart = permission.substring((permissionPrefix + ".").length());
+                try {
+                    int limit = Integer.parseInt(numberPart);
+                    if (limit > highestLimit) {
+                        highestLimit = limit;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Not a valid number, skip this permission
+                }
+            }
+        }
+        
+        return highestLimit;
     }
 
     private boolean shouldShowLimitReachedAlert(Material material) {

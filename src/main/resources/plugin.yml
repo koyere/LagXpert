@@ -3,7 +3,7 @@
 # ----------------------------------------------
 name: LagXpert
 main: me.koyere.lagxpert.LagXpert
-version: 2.3
+version: 2.4
 api-version: '1.16' # Minimum Spigot/Bukkit API version compatibility
 description: Advanced lag prevention plugin with multi-platform support (Folia/Paper/Spigot), Bedrock compatibility, and intelligent optimization systems.
 author: Koyere
@@ -167,4 +167,42 @@ permissions:
     default: false
   lagxpert.bypass.observers:
     description: Exempts from observer placement limits.
+    default: false
+
+  # Alert permissions
+  lagxpert.alerts.receive:
+    description: Allows receiving all LagXpert limit alerts
+    default: op
+
+  lagxpert.alerts.mobs:
+    description: Allows receiving mob limit alerts
+    default: op
+
+  lagxpert.alerts.blocks:
+    description: Allows receiving block limit alerts
+    default: op
+
+  # Custom limit permissions (examples - actual limits are set dynamically)
+  lagxpert.limits.*:
+    description: Allows setting custom limits for any block/mob type
+    default: false
+
+  lagxpert.limits.mobs.*:
+    description: Allows setting custom mob limits (e.g., lagxpert.limits.mobs.25)
+    default: false
+
+  lagxpert.limits.hoppers.*:
+    description: Allows setting custom hopper limits (e.g., lagxpert.limits.hoppers.15)
+    default: false
+
+  lagxpert.limits.chests.*:
+    description: Allows setting custom chest limits (e.g., lagxpert.limits.chests.20)
+    default: false
+
+  lagxpert.limits.tnt.*:
+    description: Allows setting custom TNT limits (e.g., lagxpert.limits.tnt.50)
+    default: false
+
+  lagxpert.limits.pistons.*:
+    description: Allows setting custom piston limits (e.g., lagxpert.limits.pistons.30)
     default: false

@@ -68,7 +68,8 @@ public class EntityListener implements Listener {
             }
         }
 
-        int mobLimit = ConfigManager.getMaxMobsPerChunk();
+        // Get the highest custom limit from any player in the chunk, or use default
+        int mobLimit = getEffectiveMobLimit(playersInChunk);
         int nearLimitThreshold = (int) (mobLimit * 0.80);
 
         if (livingEntitiesInChunk >= mobLimit) {
@@ -89,16 +90,19 @@ public class EntityListener implements Listener {
                 String alertCooldownKey = AlertCooldownManager.generateAlertKey("mobs_limit_reached", chunk);
 
                 for (Player player : playersInChunk) {
-                    // Check cooldown for this player and this specific alert
-                    if (AlertCooldownManager.canSendAlert(player, alertCooldownKey)) {
-                        player.sendMessage(MessageManager.getPrefixedMessage(limitMessageKey));
+                    // Only send alerts to players with permission to receive them
+                    if (player.hasPermission("lagxpert.alerts.receive") || player.hasPermission("lagxpert.alerts.mobs")) {
+                        // Check cooldown for this player and this specific alert
+                        if (AlertCooldownManager.canSendAlert(player, alertCooldownKey)) {
+                            MessageManager.sendRestrictionMessage(player, limitMessageKey);
+                        }
                     }
                 }
             }
         } else if (livingEntitiesInChunk >= nearLimitThreshold && mobLimit > 0) {
             if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldWarnOnMobsNearLimit() && !playersInChunk.isEmpty()) {
                 Player targetPlayer = findClosestPlayerToLocation(playersInChunk, spawnLocation);
-                if (targetPlayer != null) {
+                if (targetPlayer != null && (targetPlayer.hasPermission("lagxpert.alerts.receive") || targetPlayer.hasPermission("lagxpert.alerts.mobs"))) {
                     // Generate a unique key for this specific alert condition (type and chunk)
                     String alertCooldownKey = AlertCooldownManager.generateAlertKey("mobs_near_limit", chunk);
 
@@ -109,8 +113,7 @@ public class EntityListener implements Listener {
                         placeholders.put("max", String.valueOf(mobLimit));
                         placeholders.put("type", "mobs"); // Consistent with how messages.yml expects it
 
-                        String nearLimitMessage = MessageManager.getPrefixedFormattedMessage("limits.near-limit", placeholders);
-                        targetPlayer.sendMessage(nearLimitMessage);
+                        MessageManager.sendFormattedRestrictionMessage(targetPlayer, "limits.near-limit", placeholders);
                     }
                 }
             }
@@ -135,6 +138,62 @@ public class EntityListener implements Listener {
             }
         }
         return closestPlayer;
+    }
+
+    /**
+     * Gets the effective mob limit for a chunk, considering custom permission-based limits.
+     * If multiple players are in the chunk, uses the highest custom limit found.
+     * Priority: Highest custom permission limit > Default config limit
+     *
+     * @param playersInChunk List of players in the chunk
+     * @return The effective mob limit for this chunk
+     */
+    private int getEffectiveMobLimit(List<Player> playersInChunk) {
+        int highestCustomLimit = 0;
+        
+        // Check each player for custom mob limits
+        for (Player player : playersInChunk) {
+            int playerCustomLimit = getCustomLimitFromPermissions(player, "lagxpert.limits.mobs");
+            if (playerCustomLimit > highestCustomLimit) {
+                highestCustomLimit = playerCustomLimit;
+            }
+        }
+        
+        // Return custom limit if found, otherwise default
+        return highestCustomLimit > 0 ? highestCustomLimit : ConfigManager.getMaxMobsPerChunk();
+    }
+
+    /**
+     * Extracts custom limit from player permissions.
+     * Looks for permissions like "lagxpert.limits.mobs.25" and returns the highest number found.
+     *
+     * @param player The player to check permissions for
+     * @param permissionPrefix The permission prefix (e.g., "lagxpert.limits.mobs")
+     * @return The highest custom limit found, or 0 if none
+     */
+    private int getCustomLimitFromPermissions(Player player, String permissionPrefix) {
+        int highestLimit = 0;
+        
+        // Check all permissions the player has
+        for (org.bukkit.permissions.PermissionAttachmentInfo permInfo : player.getEffectivePermissions()) {
+            String permission = permInfo.getPermission();
+            
+            // Check if this permission matches our pattern
+            if (permission.startsWith(permissionPrefix + ".") && permInfo.getValue()) {
+                // Extract the number part
+                String numberPart = permission.substring((permissionPrefix + ".").length());
+                try {
+                    int limit = Integer.parseInt(numberPart);
+                    if (limit > highestLimit) {
+                        highestLimit = limit;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Not a valid number, skip this permission
+                }
+            }
+        }
+        
+        return highestLimit;
     }
 
     private void fireChunkOverloadEvent(Chunk chunk, String cause) {

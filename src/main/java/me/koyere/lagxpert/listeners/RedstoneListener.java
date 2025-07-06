@@ -167,16 +167,19 @@ public class RedstoneListener implements Listener {
         String baseAlertKey = "redstone_warning";
 
         for (Player player : players) {
-            String uniquePlayerAlertKey = AlertCooldownManager.generateAlertKey(player, baseAlertKey, alertContext);
-            if (AlertCooldownManager.canSendAlert(player, uniquePlayerAlertKey)) {
-                // Send warning message
-                player.sendMessage(MessageManager.getPrefixedMessage("limits.redstone"));
+            // Only send alerts to players with permission to receive them
+            if (player.hasPermission("lagxpert.alerts.receive") || player.hasPermission("lagxpert.alerts.blocks")) {
+                String uniquePlayerAlertKey = AlertCooldownManager.generateAlertKey(player, baseAlertKey, alertContext);
+                if (AlertCooldownManager.canSendAlert(player, uniquePlayerAlertKey)) {
+                    // Send warning message
+                    MessageManager.sendRestrictionMessage(player, "limits.redstone");
 
-                // Play warning sound
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7f, 0.8f);
+                    // Play warning sound
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7f, 0.8f);
 
-                if (ConfigManager.isDebugEnabled()) {
-                    player.sendMessage(MessageManager.color("&e[Debug] Redstone will be cut in 3 seconds due to: " + reason));
+                    if (ConfigManager.isDebugEnabled()) {
+                        player.sendMessage(MessageManager.color("&e[Debug] Redstone will be cut in 3 seconds due to: " + reason));
+                    }
                 }
             }
         }

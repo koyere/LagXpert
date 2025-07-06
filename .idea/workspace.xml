@@ -7,14 +7,11 @@
     <list default="true" id="35de2fee-0892-40b4-9e08-a9836878f6a5" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/LagXpert.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/cache/ChunkDataCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/cache/ChunkDataCache.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/EntityListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/EntityListener.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/RedstoneListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/RedstoneListener.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/StorageListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/listeners/StorageListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/monitoring/PerformanceTracker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/monitoring/PerformanceTracker.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/tasks/ItemCleanerTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/PlatformDetector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/PlatformDetector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/itemcleaner.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/itemcleaner.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/monitoring.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/monitoring.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/MessageManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/me/koyere/lagxpert/utils/MessageManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/messages.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/messages.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/plugin.yml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/plugin.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

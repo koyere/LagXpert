@@ -9,6 +9,18 @@
 # Prefix used in most plugin messages.
 prefix: "&7[&bLagXpert&7] "
 
+# == Message Delivery Configuration ==
+delivery:
+  # Default method for general messages (chat, actionbar, both)
+  default-method: "chat"
+  
+  # Settings for restriction messages (when players exceed limits)
+  restrictions:
+    # How to deliver restriction messages (chat, actionbar, both)
+    method: "actionbar"
+    # Cooldown in seconds for restriction messages (can be lower for actionbar)
+    cooldown: 5
+
 # == General Plugin and Command Messages ==
 general:
   no-permission: "&cYou don't have permission to use this command."
@@ -90,6 +102,23 @@ limits:
   observer: "&cObserver limit reached in this chunk!" # Singular key
   redstone: "&cRedstone component forcibly disabled (lag prevention)."
   near-limit: "&e[!] Warning: Chunk is nearing its limit for &f{type}&e (&f{used}&7/&f{max}&e)." # Placeholder {type}
+  
+  # Short versions for ActionBar (optional - fallback to main message if not present)
+  mobs.short: "&cMob limit reached!"
+  hopper.short: "&cHopper limit reached!"
+  chest.short: "&cChest limit reached!"
+  furnace.short: "&cFurnace limit reached!"
+  blast_furnace.short: "&cBlast furnace limit reached!"
+  smoker.short: "&cSmoker limit reached!"
+  barrel.short: "&cBarrel limit reached!"
+  dropper.short: "&cDropper limit reached!"
+  dispenser.short: "&cDispenser limit reached!"
+  shulker_box.short: "&cShulker box limit reached!"
+  tnt.short: "&cTNT limit reached!"
+  piston.short: "&cPiston limit reached!"
+  observer.short: "&cObserver limit reached!"
+  redstone.short: "&cRedstone disabled (lag prevention)"
+  near-limit.short: "&e{type} near limit: &f{used}&7/&f{max}"
 
 # == AutoChunkScanTask Messages ==
 alerts:
