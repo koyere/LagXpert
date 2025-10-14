@@ -13,6 +13,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,16 +40,7 @@ public class ChunkManager {
     private static final AtomicLong totalMemorySaved = new AtomicLong(0);
 
     // Important block types that prevent chunk unloading
-    private static final Set<Material> IMPORTANT_BLOCKS = new HashSet<>();
-
-    static {
-        // Initialize important blocks that prevent unloading
-        IMPORTANT_BLOCKS.add(Material.SPAWNER);
-        IMPORTANT_BLOCKS.add(Material.BEACON);
-        IMPORTANT_BLOCKS.add(Material.CONDUIT);
-        IMPORTANT_BLOCKS.add(Material.ENDER_CHEST);
-        // Add more as configured
-    }
+    private static final Set<Material> IMPORTANT_BLOCKS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
      * Data class for tracking chunk activity and metadata.
@@ -138,6 +130,16 @@ public class ChunkManager {
          */
         public boolean isInactive(long inactivityThresholdMs) {
             return getTimeSinceLastActivity() > inactivityThresholdMs;
+        }
+    }
+
+    /**
+     * Updates the set of important blocks that prevent chunk unloading.
+     */
+    public static void setImportantBlocks(Set<Material> materials) {
+        IMPORTANT_BLOCKS.clear();
+        if (materials != null) {
+            IMPORTANT_BLOCKS.addAll(materials);
         }
     }
 

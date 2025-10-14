@@ -11,6 +11,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.World;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -69,7 +70,7 @@ public class EntityListener implements Listener {
         }
 
         // Get the highest custom limit from any player in the chunk, or use default
-        int mobLimit = getEffectiveMobLimit(playersInChunk);
+        int mobLimit = getEffectiveMobLimit(playersInChunk, chunk.getWorld());
         int nearLimitThreshold = (int) (mobLimit * 0.80);
 
         if (livingEntitiesInChunk >= mobLimit) {
@@ -148,9 +149,9 @@ public class EntityListener implements Listener {
      * @param playersInChunk List of players in the chunk
      * @return The effective mob limit for this chunk
      */
-    private int getEffectiveMobLimit(List<Player> playersInChunk) {
+    private int getEffectiveMobLimit(List<Player> playersInChunk, World world) {
         int highestCustomLimit = 0;
-        
+
         // Check each player for custom mob limits
         for (Player player : playersInChunk) {
             int playerCustomLimit = getCustomLimitFromPermissions(player, "lagxpert.limits.mobs");
@@ -158,9 +159,9 @@ public class EntityListener implements Listener {
                 highestCustomLimit = playerCustomLimit;
             }
         }
-        
+
         // Return custom limit if found, otherwise default
-        return highestCustomLimit > 0 ? highestCustomLimit : ConfigManager.getMaxMobsPerChunk();
+        return highestCustomLimit > 0 ? highestCustomLimit : ConfigManager.getMaxMobsPerChunk(world);
     }
 
     /**

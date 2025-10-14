@@ -61,9 +61,11 @@ public class RecentlyBrokenBlocksTracker {
     
     // Map: Location key -> BrokenBlockInfo
     private static final Map<String, BrokenBlockInfo> recentlyBrokenBlocks = new ConcurrentHashMap<>();
-    
+    private static final Map<Material, Long> customGracePeriods = new ConcurrentHashMap<>();
+
     // Default grace period: 3 minutes (configurable)
     private static long defaultGracePeriodMs = 180000; // 3 minutes
+    private static volatile boolean trackingEnabled = true;
     
     // Cleanup interval: run cleanup every 30 seconds
     private static final long CLEANUP_INTERVAL_MS = 30000;
@@ -95,7 +97,7 @@ public class RecentlyBrokenBlocksTracker {
      * @param location The location where the block was broken
      */
     public static void recordBrokenBlock(Player player, Material material, Location location) {
-        recordBrokenBlock(player, material, location, defaultGracePeriodMs);
+        recordBrokenBlock(player, material, location, getGracePeriodForMaterial(material));
     }
     
     /**
@@ -107,10 +109,10 @@ public class RecentlyBrokenBlocksTracker {
      * @param gracePeriodMs Custom grace period in milliseconds
      */
     public static void recordBrokenBlock(Player player, Material material, Location location, long gracePeriodMs) {
-        if (player == null || material == null || location == null) {
+        if (!trackingEnabled || player == null || material == null || location == null || gracePeriodMs <= 0) {
             return;
         }
-        
+
         String locationKey = generateLocationKey(location);
         BrokenBlockInfo info = new BrokenBlockInfo(player.getUniqueId(), material, location, gracePeriodMs);
         
@@ -128,7 +130,7 @@ public class RecentlyBrokenBlocksTracker {
      * @return true if there's a recently broken block at this location
      */
     public static boolean hasRecentlyBrokenBlock(Location location) {
-        if (location == null) {
+        if (!trackingEnabled || location == null) {
             return false;
         }
         
@@ -156,7 +158,7 @@ public class RecentlyBrokenBlocksTracker {
      * @return true if the specified player recently broke a block at this location
      */
     public static boolean hasRecentlyBrokenBlockByPlayer(Location location, UUID playerUUID) {
-        if (location == null || playerUUID == null) {
+        if (!trackingEnabled || location == null || playerUUID == null) {
             return false;
         }
         
@@ -184,7 +186,7 @@ public class RecentlyBrokenBlocksTracker {
      * @return BrokenBlockInfo if found and within grace period, null otherwise
      */
     public static BrokenBlockInfo getBrokenBlockInfo(Location location) {
-        if (location == null) {
+        if (!trackingEnabled || location == null) {
             return null;
         }
         
@@ -194,7 +196,7 @@ public class RecentlyBrokenBlocksTracker {
         if (info == null) {
             return null;
         }
-        
+
         if (info.isWithinGracePeriod()) {
             return info;
         } else {
@@ -203,7 +205,29 @@ public class RecentlyBrokenBlocksTracker {
             return null;
         }
     }
-    
+
+    /**
+     * Configures the tracking system using values loaded from configuration.
+     */
+    public static void configure(boolean enabled, long defaultGracePeriod, Map<Material, Long> customPeriods) {
+        trackingEnabled = enabled;
+        defaultGracePeriodMs = Math.max(0, defaultGracePeriod);
+        customGracePeriods.clear();
+        if (customPeriods != null) {
+            customGracePeriods.putAll(customPeriods);
+        }
+    }
+
+    /**
+     * Gets the grace period for a specific material.
+     */
+    public static long getGracePeriodForMaterial(Material material) {
+        if (material == null) {
+            return defaultGracePeriodMs;
+        }
+        return customGracePeriods.getOrDefault(material, defaultGracePeriodMs);
+    }
+
     /**
      * Manually removes a broken block record.
      * This can be called when items are collected or when manual cleanup is needed.

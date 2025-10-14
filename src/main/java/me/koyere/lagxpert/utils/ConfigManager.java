@@ -2,6 +2,11 @@ package me.koyere.lagxpert.utils;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.config.WorldConfigManager;
+import me.koyere.lagxpert.system.ChunkManager;
+import me.koyere.lagxpert.system.RecentlyBrokenBlocksTracker;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -12,6 +17,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.logging.Level;
 
 /**
@@ -122,6 +129,11 @@ public class ConfigManager {
     private static List<String> itemCleanerEnabledWorlds;
     private static List<String> itemCleanerExcludedItems;
 
+    // === ITEM CLEANER BROKEN BLOCK TRACKING ===
+    private static boolean brokenBlockTrackingEnabled;
+    private static long brokenBlockDefaultGracePeriodMs;
+    private static final Map<Material, Long> brokenBlockCustomGracePeriods = new HashMap<>();
+
     // === ABYSS SYSTEM CONFIG (settings from itemcleaner.yml) ===
     private static boolean abyssEnabled;
     private static int abyssRetentionSeconds;
@@ -178,6 +190,7 @@ public class ConfigManager {
     private static boolean detailedLogging;
     private static boolean logStatistics;
     private static boolean includeLocations;
+    private static Set<Material> safeguardImportantBlocks = new HashSet<>();
 
     // === MONITORING CONFIG (settings from monitoring.yml, module toggle from config.yml) ===
     private static boolean tpsMonitoringEnabled;
@@ -215,6 +228,7 @@ public class ConfigManager {
     private static int tpsAlertCooldown;
     private static int memoryAlertCooldown;
     private static int lagSpikeAlertCooldown;
+    private static boolean skipAlertsWhenNoPlayersOnline;
     private static boolean analyticsEnabled;
     private static boolean dailyReportsEnabled;
     private static String dailyReportTime;
@@ -406,6 +420,40 @@ public class ConfigManager {
             itemCleanerExcludedItems = new ArrayList<>();
         }
 
+        // === ITEM CLEANER BROKEN BLOCK TRACKING ===
+        ConfigurationSection brokenBlockSection = itemCleanerConfig.getConfigurationSection("item-cleaner.broken-block-tracking");
+        brokenBlockCustomGracePeriods.clear();
+        if (brokenBlockSection != null) {
+            brokenBlockTrackingEnabled = brokenBlockSection.getBoolean("enabled", true);
+            int defaultGraceSeconds = brokenBlockSection.getInt("default-grace-period-seconds", 180);
+            if (defaultGraceSeconds < 0) {
+                LagXpert.getInstance().getLogger().warning("[ConfigManager] Broken block tracking grace period must be positive. Using 0 seconds.");
+                defaultGraceSeconds = 0;
+            }
+            brokenBlockDefaultGracePeriodMs = defaultGraceSeconds * 1000L;
+
+            ConfigurationSection customGraceSection = brokenBlockSection.getConfigurationSection("custom-grace-periods");
+            if (customGraceSection != null) {
+                for (String key : customGraceSection.getKeys(false)) {
+                    String upperKey = key.toUpperCase();
+                    try {
+                        Material material = Material.valueOf(upperKey);
+                        long seconds = customGraceSection.getLong(key);
+                        if (seconds < 0) {
+                            LagXpert.getInstance().getLogger().warning("[ConfigManager] Invalid grace period for material " + upperKey + ". Skipping.");
+                            continue;
+                        }
+                        brokenBlockCustomGracePeriods.put(material, seconds * 1000L);
+                    } catch (IllegalArgumentException ex) {
+                        LagXpert.getInstance().getLogger().warning("[ConfigManager] Unknown material in broken block tracking: " + upperKey);
+                    }
+                }
+            }
+        } else {
+            brokenBlockTrackingEnabled = false;
+            brokenBlockDefaultGracePeriodMs = 0L;
+        }
+
         // === ABYSS SYSTEM CONFIG (settings from itemcleaner.yml) ===
         abyssEnabled = itemCleanerModuleEnabled && itemCleanerConfig.getBoolean("abyss.enabled", true);
         abyssRetentionSeconds = itemCleanerConfig.getInt("abyss.retention-seconds", 120);
@@ -510,6 +558,7 @@ public class ConfigManager {
         alertsToConsole = monitoringConfig.getBoolean("alerts.delivery.console", true);
         alertsToPlayers = monitoringConfig.getBoolean("alerts.delivery.players", true);
         playerAlertPermission = monitoringConfig.getString("alerts.delivery.player-permission", "lagxpert.monitoring.alerts");
+        skipAlertsWhenNoPlayersOnline = monitoringConfig.getBoolean("alerts.delivery.skip-when-no-players-online", true);
         tpsAlertCooldown = monitoringConfig.getInt("alerts.cooldown.tps-alerts", 60);
         memoryAlertCooldown = monitoringConfig.getInt("alerts.cooldown.memory-alerts", 120);
         lagSpikeAlertCooldown = monitoringConfig.getInt("alerts.cooldown.lag-spike-alerts", 30);
@@ -558,10 +607,38 @@ public class ConfigManager {
         reduceBorderTicking = chunksConfig.getBoolean("chunk-management.border-chunks.reduce-border-ticking", true);
 
         protectImportantBlocks = chunksConfig.getBoolean("chunk-management.safeguards.protect-important-blocks", true);
+        List<String> importantBlockList = chunksConfig.getStringList("chunk-management.safeguards.important-blocks");
+        safeguardImportantBlocks = new HashSet<>();
+        if (importantBlockList == null || importantBlockList.isEmpty()) {
+            // Fallback to legacy defaults
+            safeguardImportantBlocks.add(Material.SPAWNER);
+            safeguardImportantBlocks.add(Material.BEACON);
+            safeguardImportantBlocks.add(Material.CONDUIT);
+            safeguardImportantBlocks.add(Material.ENDER_CHEST);
+            safeguardImportantBlocks.add(Material.END_PORTAL);
+            safeguardImportantBlocks.add(Material.NETHER_PORTAL);
+        } else {
+            for (String entry : importantBlockList) {
+                String upper = entry.toUpperCase();
+                try {
+                    safeguardImportantBlocks.add(Material.valueOf(upper));
+                } catch (IllegalArgumentException ex) {
+                    LagXpert.getInstance().getLogger().warning("[ConfigManager] Unknown important block material: " + upper);
+                }
+            }
+        }
         protectActiveRedstone = chunksConfig.getBoolean("chunk-management.safeguards.protect-active-redstone", true);
         protectNamedEntities = chunksConfig.getBoolean("chunk-management.safeguards.protect-named-entities", true);
         protectPlayerStructures = chunksConfig.getBoolean("chunk-management.safeguards.protect-player-structures", true);
         structureDiversityThreshold = chunksConfig.getInt("chunk-management.safeguards.structure-diversity-threshold", 20);
+
+        ChunkManager.setImportantBlocks(safeguardImportantBlocks);
+
+        RecentlyBrokenBlocksTracker.configure(
+                brokenBlockTrackingEnabled,
+                brokenBlockDefaultGracePeriodMs,
+                brokenBlockCustomGracePeriods
+        );
 
         perWorldSettingsEnabled = chunksConfig.getBoolean("chunk-management.world-settings.enabled", false);
 
@@ -1152,17 +1229,27 @@ public class ConfigManager {
 
     // --- Getters for Mob Limits ---
     public static int getMaxMobsPerChunk() { return maxMobsPerChunk; }
+    public static int getMaxMobsPerChunk(World world) { return WorldConfigManager.getMobsPerChunk(world); }
 
     // --- Getters for Storage Limits ---
     public static int getMaxHoppersPerChunk() { return maxHoppersPerChunk; }
+    public static int getMaxHoppersPerChunk(World world) { return WorldConfigManager.getHoppersPerChunk(world); }
     public static int getMaxChestsPerChunk() { return maxChestsPerChunk; }
+    public static int getMaxChestsPerChunk(World world) { return WorldConfigManager.getChestsPerChunk(world); }
     public static int getMaxFurnacesPerChunk() { return maxFurnacesPerChunk; }
+    public static int getMaxFurnacesPerChunk(World world) { return WorldConfigManager.getFurnacesPerChunk(world); }
     public static int getMaxBlastFurnacesPerChunk() { return maxBlastFurnacesPerChunk; }
+    public static int getMaxBlastFurnacesPerChunk(World world) { return WorldConfigManager.getBlastFurnacesPerChunk(world); }
     public static int getMaxSmokersPerChunk() { return maxSmokersPerChunk; }
+    public static int getMaxSmokersPerChunk(World world) { return WorldConfigManager.getSmokersPerChunk(world); }
     public static int getMaxBarrelsPerChunk() { return maxBarrelsPerChunk; }
+    public static int getMaxBarrelsPerChunk(World world) { return WorldConfigManager.getBarrelsPerChunk(world); }
     public static int getMaxDroppersPerChunk() { return maxDroppersPerChunk; }
+    public static int getMaxDroppersPerChunk(World world) { return WorldConfigManager.getDroppersPerChunk(world); }
     public static int getMaxDispensersPerChunk() { return maxDispensersPerChunk; }
+    public static int getMaxDispensersPerChunk(World world) { return WorldConfigManager.getDispensersPerChunk(world); }
     public static int getMaxShulkerBoxesPerChunk() { return maxShulkerBoxesPerChunk; }
+    public static int getMaxShulkerBoxesPerChunk(World world) { return WorldConfigManager.getShulkerBoxesPerChunk(world); }
     public static int getMaxTntPerChunk() { return maxTntPerChunk; }
     public static int getMaxPistonsPerChunk() { return maxPistonsPerChunk; }
     public static int getMaxObserversPerChunk() { return maxObserversPerChunk; }
@@ -1182,6 +1269,14 @@ public class ConfigManager {
     public static String getItemCleanerCleanedMessage() { return itemCleanerCleanedMessage; }
     public static List<String> getItemCleanerEnabledWorlds() { return Collections.unmodifiableList(itemCleanerEnabledWorlds); }
     public static List<String> getItemCleanerExcludedItems() { return Collections.unmodifiableList(itemCleanerExcludedItems); }
+    public static boolean isBrokenBlockTrackingEnabled() { return brokenBlockTrackingEnabled; }
+    public static long getBrokenBlockDefaultGracePeriodMs() { return brokenBlockDefaultGracePeriodMs; }
+    public static long getBrokenBlockGracePeriod(Material material) {
+        return brokenBlockCustomGracePeriods.getOrDefault(material, brokenBlockDefaultGracePeriodMs);
+    }
+    public static Map<Material, Long> getBrokenBlockCustomGracePeriods() {
+        return Collections.unmodifiableMap(brokenBlockCustomGracePeriods);
+    }
 
     // --- Getters for Abyss System Configuration ---
     public static boolean isAbyssEnabled() { return abyssEnabled; }
@@ -1219,6 +1314,7 @@ public class ConfigManager {
     public static boolean isDetailedLogging() { return detailedLogging; }
     public static boolean shouldLogStatistics() { return logStatistics; }
     public static boolean shouldIncludeLocations() { return includeLocations; }
+    public static Set<Material> getSafeguardImportantBlocks() { return Collections.unmodifiableSet(safeguardImportantBlocks); }
 
     // --- Getters for Monitoring Configuration ---
     public static boolean isMonitoringModuleEnabled() { return monitoringModuleEnabled; }
@@ -1257,6 +1353,7 @@ public class ConfigManager {
     public static int getTPSAlertCooldown() { return tpsAlertCooldown; }
     public static int getMemoryAlertCooldown() { return memoryAlertCooldown; }
     public static int getLagSpikeAlertCooldown() { return lagSpikeAlertCooldown; }
+    public static boolean shouldSkipAlertsWhenNoPlayersOnline() { return skipAlertsWhenNoPlayersOnline; }
     public static boolean isAnalyticsEnabled() { return analyticsEnabled; }
     public static boolean isDailyReportsEnabled() { return dailyReportsEnabled; }
     public static String getDailyReportTime() { return dailyReportTime; }

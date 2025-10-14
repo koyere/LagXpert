@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 /**
  * Scheduled task that periodically scans loaded chunks near players for elements
@@ -37,27 +38,27 @@ public class AutoChunkScanTask extends BukkitRunnable {
     private static final class ScannableElement {
         private final String displayName;
         private final Material material;
-        private final Supplier<Integer> limitSupplier;
+        private final ToIntFunction<Chunk> limitFunction;
         private final String overloadCauseSuffix;
         private final CounterType counterType;
         private final Supplier<Boolean> nearLimitWarningToggle;
 
-        public ScannableElement(String displayName, Material material, Supplier<Integer> limitSupplier, String overloadCauseSuffix, CounterType counterType, Supplier<Boolean> nearLimitToggle) {
+        public ScannableElement(String displayName, Material material, ToIntFunction<Chunk> limitFunction, String overloadCauseSuffix, CounterType counterType, Supplier<Boolean> nearLimitToggle) {
             this.displayName = displayName;
             this.material = material;
-            this.limitSupplier = limitSupplier;
+            this.limitFunction = limitFunction;
             this.overloadCauseSuffix = overloadCauseSuffix;
             this.counterType = counterType;
             this.nearLimitWarningToggle = nearLimitToggle;
         }
 
-        public ScannableElement(String displayName, Supplier<Integer> limitSupplier, String overloadCauseSuffix, Supplier<Boolean> nearLimitToggle) {
-            this(displayName, null, limitSupplier, overloadCauseSuffix, CounterType.LIVING_ENTITY, nearLimitToggle);
+        public ScannableElement(String displayName, ToIntFunction<Chunk> limitFunction, String overloadCauseSuffix, Supplier<Boolean> nearLimitToggle) {
+            this(displayName, null, limitFunction, overloadCauseSuffix, CounterType.LIVING_ENTITY, nearLimitToggle);
         }
 
         public String getDisplayName() { return displayName; }
         public Material getMaterial() { return material; }
-        public Supplier<Integer> getLimitSupplier() { return limitSupplier; }
+        public int getLimit(Chunk chunk) { return limitFunction.applyAsInt(chunk); }
         public String getOverloadCauseSuffix() { return overloadCauseSuffix; }
         public CounterType getCounterType() { return counterType; }
         public Supplier<Boolean> getNearLimitWarningToggle() { return nearLimitWarningToggle; }
@@ -73,21 +74,21 @@ public class AutoChunkScanTask extends BukkitRunnable {
     private static final List<ScannableElement> elementsToScan = new ArrayList<>();
 
     static {
-        elementsToScan.add(new ScannableElement("Mobs", ConfigManager::getMaxMobsPerChunk, "mobs", ConfigManager::shouldWarnOnMobsNearLimit));
-        elementsToScan.add(new ScannableElement("Hoppers", Material.HOPPER, ConfigManager::getMaxHoppersPerChunk, "hoppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnHoppersNearLimit));
-        elementsToScan.add(new ScannableElement("Chests", Material.CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
-        elementsToScan.add(new ScannableElement("Trapped Chests", Material.TRAPPED_CHEST, ConfigManager::getMaxChestsPerChunk, "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
-        elementsToScan.add(new ScannableElement("Furnaces", Material.FURNACE, ConfigManager::getMaxFurnacesPerChunk, "furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnFurnacesNearLimit));
-        elementsToScan.add(new ScannableElement("Blast Furnaces", Material.BLAST_FURNACE, ConfigManager::getMaxBlastFurnacesPerChunk, "blast_furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBlastFurnacesNearLimit));
-        elementsToScan.add(new ScannableElement("Smokers", Material.SMOKER, ConfigManager::getMaxSmokersPerChunk, "smokers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnSmokersNearLimit));
-        elementsToScan.add(new ScannableElement("Barrels", Material.BARREL, ConfigManager::getMaxBarrelsPerChunk, "barrels", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBarrelsNearLimit));
-        elementsToScan.add(new ScannableElement("Droppers", Material.DROPPER, ConfigManager::getMaxDroppersPerChunk, "droppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDroppersNearLimit));
-        elementsToScan.add(new ScannableElement("Dispensers", Material.DISPENSER, ConfigManager::getMaxDispensersPerChunk, "dispensers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDispensersNearLimit));
-        elementsToScan.add(new ScannableElement("Shulker Boxes", Material.SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnShulkerBoxesNearLimit));
-        elementsToScan.add(new ScannableElement("TNT", Material.TNT, ConfigManager::getMaxTntPerChunk, "tnt", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnTntNearLimit));
-        elementsToScan.add(new ScannableElement("Pistons", Material.PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
-        elementsToScan.add(new ScannableElement("Sticky Pistons", Material.STICKY_PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
-        elementsToScan.add(new ScannableElement("Observers", Material.OBSERVER, ConfigManager::getMaxObserversPerChunk, "observers", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnObserversNearLimit));
+        elementsToScan.add(new ScannableElement("Mobs", chunk -> ConfigManager.getMaxMobsPerChunk(chunk.getWorld()), "mobs", ConfigManager::shouldWarnOnMobsNearLimit));
+        elementsToScan.add(new ScannableElement("Hoppers", Material.HOPPER, chunk -> ConfigManager.getMaxHoppersPerChunk(chunk.getWorld()), "hoppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnHoppersNearLimit));
+        elementsToScan.add(new ScannableElement("Chests", Material.CHEST, chunk -> ConfigManager.getMaxChestsPerChunk(chunk.getWorld()), "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
+        elementsToScan.add(new ScannableElement("Trapped Chests", Material.TRAPPED_CHEST, chunk -> ConfigManager.getMaxChestsPerChunk(chunk.getWorld()), "chests", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnChestsNearLimit));
+        elementsToScan.add(new ScannableElement("Furnaces", Material.FURNACE, chunk -> ConfigManager.getMaxFurnacesPerChunk(chunk.getWorld()), "furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnFurnacesNearLimit));
+        elementsToScan.add(new ScannableElement("Blast Furnaces", Material.BLAST_FURNACE, chunk -> ConfigManager.getMaxBlastFurnacesPerChunk(chunk.getWorld()), "blast_furnaces", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBlastFurnacesNearLimit));
+        elementsToScan.add(new ScannableElement("Smokers", Material.SMOKER, chunk -> ConfigManager.getMaxSmokersPerChunk(chunk.getWorld()), "smokers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnSmokersNearLimit));
+        elementsToScan.add(new ScannableElement("Barrels", Material.BARREL, chunk -> ConfigManager.getMaxBarrelsPerChunk(chunk.getWorld()), "barrels", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnBarrelsNearLimit));
+        elementsToScan.add(new ScannableElement("Droppers", Material.DROPPER, chunk -> ConfigManager.getMaxDroppersPerChunk(chunk.getWorld()), "droppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDroppersNearLimit));
+        elementsToScan.add(new ScannableElement("Dispensers", Material.DISPENSER, chunk -> ConfigManager.getMaxDispensersPerChunk(chunk.getWorld()), "dispensers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDispensersNearLimit));
+        elementsToScan.add(new ScannableElement("Shulker Boxes", Material.SHULKER_BOX, chunk -> ConfigManager.getMaxShulkerBoxesPerChunk(chunk.getWorld()), "shulker_boxes", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnShulkerBoxesNearLimit));
+        elementsToScan.add(new ScannableElement("TNT", Material.TNT, chunk -> ConfigManager.getMaxTntPerChunk(), "tnt", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnTntNearLimit));
+        elementsToScan.add(new ScannableElement("Pistons", Material.PISTON, chunk -> ConfigManager.getMaxPistonsPerChunk(), "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
+        elementsToScan.add(new ScannableElement("Sticky Pistons", Material.STICKY_PISTON, chunk -> ConfigManager.getMaxPistonsPerChunk(), "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
+        elementsToScan.add(new ScannableElement("Observers", Material.OBSERVER, chunk -> ConfigManager.getMaxObserversPerChunk(), "observers", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnObserversNearLimit));
     }
 
     @Override
@@ -136,7 +137,7 @@ public class AutoChunkScanTask extends BukkitRunnable {
 
                 for (ScannableElement element : elementsToScan) {
                     int count = getElementCount(currentChunk, element, chunkData);
-                    int limit = element.getLimitSupplier().get();
+                    int limit = element.getLimit(currentChunk);
 
                     if (limit <= 0) continue;
 

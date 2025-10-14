@@ -7,7 +7,7 @@
 # Use this file to enable or disable core functionalities and set global options.
 
 # Configuration version (DO NOT MODIFY)
-config-version: "2.2"
+config-version: "2.5"
 
 # 🧩 Modules Activation
 # Activate or deactivate main plugin functionalities.

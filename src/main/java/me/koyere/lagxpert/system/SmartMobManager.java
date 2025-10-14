@@ -234,7 +234,7 @@ public class SmartMobManager {
             return 0;
         }
         
-        int mobLimit = ConfigManager.getMaxMobsPerChunk();
+        int mobLimit = ConfigManager.getMaxMobsPerChunk(chunk.getWorld());
         List<LivingEntity> livingEntities = mobData.getLivingEntities();
         int currentCount = livingEntities.size();
         
@@ -587,8 +587,8 @@ public class SmartMobManager {
         }
         
         public boolean needsProcessing() {
-            return !hasBypassPermission && 
-                   livingEntities.size() > ConfigManager.getMaxMobsPerChunk();
+            return !hasBypassPermission &&
+                   livingEntities.size() > ConfigManager.getMaxMobsPerChunk(chunk.getWorld());
         }
         
         public Chunk getChunk() { return chunk; }

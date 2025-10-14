@@ -14,6 +14,7 @@ import me.koyere.lagxpert.system.RedstoneCircuitTracker;
 import me.koyere.lagxpert.tasks.AsyncChunkAnalyzer;
 import me.koyere.lagxpert.tasks.AutoChunkScanTask;
 import me.koyere.lagxpert.tasks.ChunkPreloader;
+import me.koyere.lagxpert.tasks.ChunkActivityCleanupTask;
 import me.koyere.lagxpert.tasks.EntityCleanupTask;
 import me.koyere.lagxpert.tasks.InactiveChunkUnloader;
 import me.koyere.lagxpert.tasks.ItemCleanerTask;
@@ -372,6 +373,10 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isItemCleanerModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new ItemCleanerListener(), this);
         }
+
+        if (ConfigManager.isChunkManagementModuleEnabled() && ConfigManager.isChunkActivityTrackingEnabled()) {
+            getServer().getPluginManager().registerEvents(new ChunkActivityListener(), this);
+        }
     }
 
     /**
@@ -409,6 +414,17 @@ public class LagXpert extends JavaPlugin {
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] EntityCleanupTask scheduled with interval: " + entityCleanupInterval + " ticks");
+            }
+        }
+
+        if (ConfigManager.isChunkManagementModuleEnabled() && ConfigManager.isChunkActivityTrackingEnabled()) {
+            int cleanupInterval = ConfigManager.getActivityCleanupIntervalTicks();
+            if (cleanupInterval > 0) {
+                new ChunkActivityCleanupTask().runTaskTimer(this, cleanupInterval, cleanupInterval);
+
+                if (ConfigManager.isDebugEnabled()) {
+                    getLogger().info("[LagXpert] ChunkActivityCleanupTask scheduled with interval: " + cleanupInterval + " ticks");
+                }
             }
         }
     }

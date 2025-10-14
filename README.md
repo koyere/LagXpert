@@ -1,8 +1,8 @@
-# 🔧 LagXpert Free v2.2
+# 🔧 LagXpert Free v2.5
 
 **LagXpert Free** is an advanced lag prevention plugin with **multi-platform support** (Folia/Paper/Spigot/Bukkit), **Bedrock compatibility**, and **intelligent optimization systems**. Designed to actively prevent and optimize lag sources rather than just detect them.
 
-![Version](https://img.shields.io/badge/version-2.2-blue)
+![Version](https://img.shields.io/badge/version-2.5-blue)
 ![Platforms](https://img.shields.io/badge/platforms-Folia%20%7C%20Paper%20%7C%20Spigot%20%7C%20Bukkit-green)
 ![Bedrock](https://img.shields.io/badge/bedrock-compatible-orange)
 ![bStats](https://img.shields.io/badge/bStats-enabled-brightgreen)
@@ -11,11 +11,10 @@
 
 ## 📦 Features
 
-### 🚀 **NEW in v2.2: Advanced Optimization**
-- ✅ **Smart mob management** - Automatically removes excess mobs while protecting important ones
-- ✅ **Multi-platform support** - Optimized for Folia, Paper, Spigot, and Bukkit
-- ✅ **Bedrock compatibility** - Full support for Bedrock players via Geyser/Floodgate
-- ✅ **Intelligent protection** - Preserves named, tamed, equipped, and plugin entities
+### 🚀 **NEW in v2.5: Smarter World-Aware Control**
+- ✅ **Per-world limits** - Mob and storage limits respect world-specific overrides automatically
+- ✅ **Configurable grace periods** - Item cleaner broken-block tracking fully driven by YAML, including material overrides
+- ✅ **Chunk safeguards** - Important block list and activity tracking configurable without restarts
 - ✅ **Performance-first design** - Zero lag added, maximum optimization gained
 
 ### 🎯 **Core Features**

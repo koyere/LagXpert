@@ -28,11 +28,11 @@ public class ItemCleanerListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        // Only track if item cleaner module is enabled
-        if (!ConfigManager.isItemCleanerModuleEnabled()) {
+        // Only track if item cleaner module and tracking are enabled
+        if (!ConfigManager.isItemCleanerModuleEnabled() || !ConfigManager.isBrokenBlockTrackingEnabled()) {
             return;
         }
-        
+
         Player player = event.getPlayer();
         Block block = event.getBlock();
         Material material = block.getType();
@@ -48,8 +48,11 @@ public class ItemCleanerListener implements Listener {
         }
         
         // Get grace period from configuration (with fallback to default)
-        long gracePeriodMs = getGracePeriodForMaterial(material);
-        
+        long gracePeriodMs = RecentlyBrokenBlocksTracker.getGracePeriodForMaterial(material);
+        if (gracePeriodMs <= 0) {
+            return;
+        }
+
         // Record the broken block with grace period
         RecentlyBrokenBlocksTracker.recordBrokenBlock(player, material, block.getLocation(), gracePeriodMs);
         
@@ -72,7 +75,9 @@ public class ItemCleanerListener implements Listener {
         Player player = event.getPlayer();
         
         // Clear all broken block records for this player
-        RecentlyBrokenBlocksTracker.clearPlayerRecords(player.getUniqueId());
+        if (ConfigManager.isBrokenBlockTrackingEnabled()) {
+            RecentlyBrokenBlocksTracker.clearPlayerRecords(player.getUniqueId());
+        }
         
         if (ConfigManager.isDebugEnabled()) {
             LagXpert.getInstance().getLogger().info(
@@ -134,40 +139,5 @@ public class ItemCleanerListener implements Listener {
      * @param material The material that was broken
      * @return Grace period in milliseconds
      */
-    private long getGracePeriodForMaterial(Material material) {
-        // Check if there's a custom grace period configured
-        // For now, use default, but this could be made configurable per material
-        long defaultGracePeriod = RecentlyBrokenBlocksTracker.getDefaultGracePeriodMs();
-        
-        // Special cases for valuable blocks that players might take longer to collect
-        switch (material) {
-            case DIAMOND_ORE:
-            case EMERALD_ORE:
-            case ANCIENT_DEBRIS:
-                // Valuable ores get longer grace period (5 minutes)
-                return 300000L;
-                
-            case GOLD_ORE:
-            case IRON_ORE:
-            case COAL_ORE:
-                // Common ores get medium grace period (4 minutes)
-                return 240000L;
-                
-            case CHEST:
-            case TRAPPED_CHEST:
-            case BARREL:
-                // Storage blocks get extended grace period (10 minutes)
-                // Players often need time to sort contents
-                return 600000L;
-                
-            case SPAWNER:
-                // Spawners get very long grace period (15 minutes)
-                // They're extremely valuable and rare
-                return 900000L;
-                
-            default:
-                // Use configured default grace period
-                return defaultGracePeriod;
-        }
-    }
+    // Grace periods are now fully driven by configuration via ConfigManager/RecentlyBrokenBlocksTracker
 }

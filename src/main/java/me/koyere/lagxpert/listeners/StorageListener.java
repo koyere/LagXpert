@@ -10,6 +10,7 @@ import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -23,7 +24,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 /**
  * Listens for block placements and restricts storage-related blocks
@@ -36,17 +37,17 @@ public class StorageListener implements Listener {
     // Helper class (replaces record) to store configuration for each limited block type
     private static final class BlockLimitConfig {
         private final Material material;
-        private final Supplier<Integer> limitSupplier;
+        private final ToIntFunction<World> limitFunction;
         private final String bypassPermissionSuffix;
         private final String limitMessageKey;
         private final String nearLimitMessageKey;
         private final String overloadCause; // Used for event cause and part of alert key
         private final boolean isTileEntity;
 
-        public BlockLimitConfig(Material material, Supplier<Integer> limitSupplier, String bypassPermissionSuffix,
+        public BlockLimitConfig(Material material, ToIntFunction<World> limitFunction, String bypassPermissionSuffix,
                                 String limitMessageKey, String nearLimitMessageKey, String overloadCause, boolean isTileEntity) {
             this.material = material;
-            this.limitSupplier = limitSupplier;
+            this.limitFunction = limitFunction;
             this.bypassPermissionSuffix = bypassPermissionSuffix;
             this.limitMessageKey = limitMessageKey;
             this.nearLimitMessageKey = nearLimitMessageKey;
@@ -56,7 +57,7 @@ public class StorageListener implements Listener {
 
         // Getters
         public Material getMaterial() { return material; }
-        public Supplier<Integer> getLimitSupplier() { return limitSupplier; }
+        public int getLimit(World world) { return limitFunction.applyAsInt(world); }
         public String getBypassPermissionSuffix() { return bypassPermissionSuffix; }
         public String getLimitMessageKey() { return limitMessageKey; }
         public String getNearLimitMessageKey() { return nearLimitMessageKey; }
@@ -67,42 +68,42 @@ public class StorageListener implements Listener {
     private static final Map<Material, BlockLimitConfig> limitedBlocks = new EnumMap<>(Material.class);
 
     static {
-        addLimitedBlock(Material.HOPPER, ConfigManager::getMaxHoppersPerChunk, "hoppers", "limits.hopper", "hoppers", true);
-        addLimitedBlock(Material.CHEST, ConfigManager::getMaxChestsPerChunk, "chests", "limits.chest", "chests", true);
-        addLimitedBlock(Material.TRAPPED_CHEST, ConfigManager::getMaxChestsPerChunk, "chests", "limits.chest", "chests", true);
-        addLimitedBlock(Material.FURNACE, ConfigManager::getMaxFurnacesPerChunk, "furnaces", "limits.furnace", "furnaces", true);
-        addLimitedBlock(Material.BLAST_FURNACE, ConfigManager::getMaxBlastFurnacesPerChunk, "blast_furnaces", "limits.blast_furnace", "blast_furnaces", true);
-        addLimitedBlock(Material.SMOKER, ConfigManager::getMaxSmokersPerChunk, "smokers", "limits.smoker", "smokers", true);
-        addLimitedBlock(Material.BARREL, ConfigManager::getMaxBarrelsPerChunk, "barrels", "limits.barrel", "barrels", true);
-        addLimitedBlock(Material.DROPPER, ConfigManager::getMaxDroppersPerChunk, "droppers", "limits.dropper", "droppers", true);
-        addLimitedBlock(Material.DISPENSER, ConfigManager::getMaxDispensersPerChunk, "dispensers", "limits.dispenser", "dispensers", true);
-        addLimitedBlock(Material.SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.HOPPER, world -> ConfigManager.getMaxHoppersPerChunk(world), "hoppers", "limits.hopper", "hoppers", true);
+        addLimitedBlock(Material.CHEST, world -> ConfigManager.getMaxChestsPerChunk(world), "chests", "limits.chest", "chests", true);
+        addLimitedBlock(Material.TRAPPED_CHEST, world -> ConfigManager.getMaxChestsPerChunk(world), "chests", "limits.chest", "chests", true);
+        addLimitedBlock(Material.FURNACE, world -> ConfigManager.getMaxFurnacesPerChunk(world), "furnaces", "limits.furnace", "furnaces", true);
+        addLimitedBlock(Material.BLAST_FURNACE, world -> ConfigManager.getMaxBlastFurnacesPerChunk(world), "blast_furnaces", "limits.blast_furnace", "blast_furnaces", true);
+        addLimitedBlock(Material.SMOKER, world -> ConfigManager.getMaxSmokersPerChunk(world), "smokers", "limits.smoker", "smokers", true);
+        addLimitedBlock(Material.BARREL, world -> ConfigManager.getMaxBarrelsPerChunk(world), "barrels", "limits.barrel", "barrels", true);
+        addLimitedBlock(Material.DROPPER, world -> ConfigManager.getMaxDroppersPerChunk(world), "droppers", "limits.dropper", "droppers", true);
+        addLimitedBlock(Material.DISPENSER, world -> ConfigManager.getMaxDispensersPerChunk(world), "dispensers", "limits.dispenser", "dispensers", true);
+        addLimitedBlock(Material.SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
         // Add all 16 colored shulker boxes
-        addLimitedBlock(Material.WHITE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.ORANGE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.MAGENTA_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.LIGHT_BLUE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.YELLOW_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.LIME_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.PINK_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.GRAY_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.LIGHT_GRAY_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.CYAN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.PURPLE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.BLUE_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.BROWN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.GREEN_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.RED_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.BLACK_SHULKER_BOX, ConfigManager::getMaxShulkerBoxesPerChunk, "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.TNT, ConfigManager::getMaxTntPerChunk, "tnt", "limits.tnt", "tnt", false);
-        addLimitedBlock(Material.PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", "limits.piston", "pistons", false);
-        addLimitedBlock(Material.STICKY_PISTON, ConfigManager::getMaxPistonsPerChunk, "pistons", "limits.piston", "pistons", false);
-        addLimitedBlock(Material.OBSERVER, ConfigManager::getMaxObserversPerChunk, "observers", "limits.observer", "observers", false);
+        addLimitedBlock(Material.WHITE_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.ORANGE_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.MAGENTA_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIGHT_BLUE_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.YELLOW_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIME_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.PINK_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.GRAY_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.LIGHT_GRAY_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.CYAN_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.PURPLE_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BLUE_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BROWN_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.GREEN_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.RED_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.BLACK_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
+        addLimitedBlock(Material.TNT, world -> ConfigManager.getMaxTntPerChunk(), "tnt", "limits.tnt", "tnt", false);
+        addLimitedBlock(Material.PISTON, world -> ConfigManager.getMaxPistonsPerChunk(), "pistons", "limits.piston", "pistons", false);
+        addLimitedBlock(Material.STICKY_PISTON, world -> ConfigManager.getMaxPistonsPerChunk(), "pistons", "limits.piston", "pistons", false);
+        addLimitedBlock(Material.OBSERVER, world -> ConfigManager.getMaxObserversPerChunk(), "observers", "limits.observer", "observers", false);
     }
 
-    private static void addLimitedBlock(Material material, Supplier<Integer> limitSupplier, String permSuffix,
+    private static void addLimitedBlock(Material material, ToIntFunction<World> limitFunction, String permSuffix,
                                         String msgKey, String cause, boolean isTile) {
-        limitedBlocks.put(material, new BlockLimitConfig(material, limitSupplier, "lagxpert.bypass." + permSuffix,
+        limitedBlocks.put(material, new BlockLimitConfig(material, limitFunction, "lagxpert.bypass." + permSuffix,
                 msgKey, "limits.near-limit", cause, isTile));
     }
 
@@ -134,7 +135,7 @@ public class StorageListener implements Listener {
 
             // Get current count using cache-optimized methods
             int currentCount = getCurrentCount(chunk, config);
-            int limit = getEffectiveLimit(player, config);
+            int limit = getEffectiveLimit(player, config, chunk.getWorld());
 
             // Check if we're already at the limit (fix off-by-one error)
             if (currentCount >= limit && limit > 0) {
@@ -286,18 +287,18 @@ public class StorageListener implements Listener {
      * @param config The block configuration
      * @return The effective limit for this player
      */
-    private int getEffectiveLimit(Player player, BlockLimitConfig config) {
+    private int getEffectiveLimit(Player player, BlockLimitConfig config, World world) {
         // Get the permission key for this material type
         String permissionPrefix = "lagxpert.limits." + config.getOverloadCause().replace("_", ".");
-        
+
         // Check for custom limit permissions (e.g., lagxpert.limits.hoppers.15)
         int customLimit = getCustomLimitFromPermissions(player, permissionPrefix);
         if (customLimit > 0) {
             return customLimit;
         }
-        
+
         // Fall back to default config limit
-        return config.getLimitSupplier().get();
+        return config.getLimit(world);
     }
 
     /**
