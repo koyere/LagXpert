@@ -1,0 +1,37 @@
+# 🚗 Vehicle Manager Configuration
+# Optimize and limit vehicles (boats, minecarts) to prevent lag.
+
+enabled: true
+
+# 📊 Limits
+# Maximum vehicles per chunk. Excess vehicles will be removed or prevented.
+limits:
+  # Global limits
+  minecarts:
+    per-chunk: 8
+    check-radius: 4 # Check radius for stacked limit/collision checks
+  
+  boats:
+    per-chunk: 5
+
+# 🧹 Cleanup Settings
+cleanup:
+  # Automatically remove minecarts in mineshafts that contain loot but were abandoned
+  # (Requires scanning NBT, can be slightly heavy, so it runs periodically)
+  remove-abandoned-loot-carts: true
+  
+  # Remove boats/carts that have been empty for a long time?
+  remove-empty-vehicles: true
+  empty-timeout-seconds: 300 # 5 minutes
+
+# 🧪 Optimizations
+optimization:
+  # If true, vehicles without passengers that are not moving will stop processing physics/collision
+  disable-physics-for-empty: true
+  
+  # Prevent collision checks for vehicles in full chunks
+  reduce-collision-checks: true
+
+# 🌍 World Settings
+disabled-worlds:
+  - "creative_plot_world"

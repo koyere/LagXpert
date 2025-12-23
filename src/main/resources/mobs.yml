@@ -67,3 +67,31 @@ smart-management:
     # - "world"
     # - "world_nether"
     # - "world_the_end"
+
+# 🧠 NEW v2.6: Mob AI Optimizer
+# Reduces server strain by disabling AI on specific mobs or in specific conditions
+ai-optimizer:
+  enabled: true
+  
+  # Entities in this list will have their AI disabled immediately upon spawn
+  # Useful for farm animals or visual-only mobs
+  disable-ai-types:
+    - "SQUID"
+    - "BAT"
+    - "COD"
+    - "SALMON"
+    - "TROPICAL_FISH"
+    
+  # Mobs in these worlds will have AI disabled (use carefully)
+  disable-ai-worlds: []
+  
+  # If true, entities far from players (e.g., > 64 blocks) will have AI simplified/disabled
+  # This is a dynamic check during chunk scans
+  distance-optimization:
+    enabled: true
+    distance-threshold: 64
+    
+  # Prevent mobs from looking for paths (heavy operation) if they are enclosed
+  # Requires more processing to detect, but saves pathfinding performance
+  check-enclosed: false
+

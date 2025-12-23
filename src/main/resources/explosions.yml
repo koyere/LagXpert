@@ -1,0 +1,33 @@
+# 💥 Explosion Controller Configuration
+# Manage and optimize explosions to prevent server crashes and lag.
+
+enabled: true
+
+# 🔧 Optimization Settings
+settings:
+  # Prevent massive chain reactions by limiting how many TNTs can fuse simultaneously in a chunk
+  prevent-chain-reaction: true
+  max-primed-tnt-per-chunk: 20
+  
+  # Clean drops from explosions to prevent item lag
+  # If true, blocks destroyed by explosions won't drop items (except rare ores if configured)
+  disable-explosion-drops: false
+  
+  # If above is false, you can still limit the drop rate (0.0 - 1.0)
+  # 0.3 = 30% of blocks will drop items
+  drop-chance: 0.3
+
+# 📏 Blast Radius Clamping
+# Limit the maximum power of explosions to prevent massive terrain damage calculation
+radius-limits:
+  tnt: 4.0        # Default Minecraft is 4.0
+  creeper: 3.0    # Default Minecraft is 3.0 (Charged is 6.0)
+  crystal: 6.0    # End Crystal default is 6.0
+  fireball: 1.0   # Ghast fireball default is 1.0
+  wither: 7.0     # Wither spawn/death default is 7.0
+  other: 4.0      # Any other explosion source
+
+# 🌍 World Settings
+# Disable explosion control in these worlds
+disabled-worlds:
+  - "creative_world"

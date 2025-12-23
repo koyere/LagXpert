@@ -3,6 +3,7 @@ package me.koyere.lagxpert.listeners;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.system.AlertCooldownManager; // Import AlertCooldownManager
+import me.koyere.lagxpert.system.MobAIOptimizer;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -24,7 +25,8 @@ import java.util.Map;
 
 /**
  * Prevents mob spawning if the chunk has exceeded the configured mob limit.
- * Also warns the nearest player in the chunk if the mob count approaches 80% of the limit,
+ * Also warns the nearest player in the chunk if the mob count approaches 80% of
+ * the limit,
  * subject to fine-grained alert configurations and alert cooldowns.
  * Spawn is bypassed if a player in the chunk has the bypass permission.
  */
@@ -34,6 +36,11 @@ public class EntityListener implements Listener {
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (!ConfigManager.isMobsModuleEnabled()) {
             return;
+        }
+
+        // Apply AI optimization immediately
+        if (event.getEntity() instanceof LivingEntity) {
+            MobAIOptimizer.getInstance().optimizeEntity(event.getEntity());
         }
 
         Location spawnLocation = event.getLocation();
@@ -54,8 +61,7 @@ public class EntityListener implements Listener {
                         LagXpert.getInstance().getLogger().info(
                                 "Mob spawn at " + locationToString(spawnLocation) +
                                         " (Chunk: " + chunk.getX() + "," + chunk.getZ() + ")" +
-                                        " bypassed due to player " + player.getName() + " having permission."
-                        );
+                                        " bypassed due to player " + player.getName() + " having permission.");
                     }
                     return;
                 }
@@ -81,18 +87,19 @@ public class EntityListener implements Listener {
                 LagXpert.getInstance().getLogger().info(
                         "Cancelled mob spawn at " + locationToString(spawnLocation) +
                                 " (Chunk: " + chunk.getX() + "," + chunk.getZ() + "). " +
-                                "Count: " + livingEntitiesInChunk + ", Limit: " + mobLimit
-                );
+                                "Count: " + livingEntitiesInChunk + ", Limit: " + mobLimit);
             }
 
-            if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldAlertOnMobsLimitReached() && !playersInChunk.isEmpty()) {
+            if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldAlertOnMobsLimitReached()
+                    && !playersInChunk.isEmpty()) {
                 String limitMessageKey = "limits.mobs"; // The key for the message in messages.yml
                 // Generate a unique key for this specific alert condition (type and chunk)
                 String alertCooldownKey = AlertCooldownManager.generateAlertKey("mobs_limit_reached", chunk);
 
                 for (Player player : playersInChunk) {
                     // Only send alerts to players with permission to receive them
-                    if (player.hasPermission("lagxpert.alerts.receive") || player.hasPermission("lagxpert.alerts.mobs")) {
+                    if (player.hasPermission("lagxpert.alerts.receive")
+                            || player.hasPermission("lagxpert.alerts.mobs")) {
                         // Check cooldown for this player and this specific alert
                         if (AlertCooldownManager.canSendAlert(player, alertCooldownKey)) {
                             MessageManager.sendRestrictionMessage(player, limitMessageKey);
@@ -101,9 +108,11 @@ public class EntityListener implements Listener {
                 }
             }
         } else if (livingEntitiesInChunk >= nearLimitThreshold && mobLimit > 0) {
-            if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldWarnOnMobsNearLimit() && !playersInChunk.isEmpty()) {
+            if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldWarnOnMobsNearLimit()
+                    && !playersInChunk.isEmpty()) {
                 Player targetPlayer = findClosestPlayerToLocation(playersInChunk, spawnLocation);
-                if (targetPlayer != null && (targetPlayer.hasPermission("lagxpert.alerts.receive") || targetPlayer.hasPermission("lagxpert.alerts.mobs"))) {
+                if (targetPlayer != null && (targetPlayer.hasPermission("lagxpert.alerts.receive")
+                        || targetPlayer.hasPermission("lagxpert.alerts.mobs"))) {
                     // Generate a unique key for this specific alert condition (type and chunk)
                     String alertCooldownKey = AlertCooldownManager.generateAlertKey("mobs_near_limit", chunk);
 
@@ -129,7 +138,11 @@ public class EntityListener implements Listener {
         double minDistanceSquared = Double.MAX_VALUE;
 
         for (Player player : players) {
-            if (!player.isValid() || (location.getWorld() != null && !player.getWorld().equals(location.getWorld()))) { // Added null check for location.getWorld()
+            if (!player.isValid() || (location.getWorld() != null && !player.getWorld().equals(location.getWorld()))) { // Added
+                                                                                                                        // null
+                                                                                                                        // check
+                                                                                                                        // for
+                                                                                                                        // location.getWorld()
                 continue;
             }
             double distanceSquared = player.getLocation().distanceSquared(location);
@@ -142,7 +155,8 @@ public class EntityListener implements Listener {
     }
 
     /**
-     * Gets the effective mob limit for a chunk, considering custom permission-based limits.
+     * Gets the effective mob limit for a chunk, considering custom permission-based
+     * limits.
      * If multiple players are in the chunk, uses the highest custom limit found.
      * Priority: Highest custom permission limit > Default config limit
      *
@@ -166,19 +180,20 @@ public class EntityListener implements Listener {
 
     /**
      * Extracts custom limit from player permissions.
-     * Looks for permissions like "lagxpert.limits.mobs.25" and returns the highest number found.
+     * Looks for permissions like "lagxpert.limits.mobs.25" and returns the highest
+     * number found.
      *
-     * @param player The player to check permissions for
+     * @param player           The player to check permissions for
      * @param permissionPrefix The permission prefix (e.g., "lagxpert.limits.mobs")
      * @return The highest custom limit found, or 0 if none
      */
     private int getCustomLimitFromPermissions(Player player, String permissionPrefix) {
         int highestLimit = 0;
-        
+
         // Check all permissions the player has
         for (org.bukkit.permissions.PermissionAttachmentInfo permInfo : player.getEffectivePermissions()) {
             String permission = permInfo.getPermission();
-            
+
             // Check if this permission matches our pattern
             if (permission.startsWith(permissionPrefix + ".") && permInfo.getValue()) {
                 // Extract the number part
@@ -193,7 +208,7 @@ public class EntityListener implements Listener {
                 }
             }
         }
-        
+
         return highestLimit;
     }
 
@@ -203,7 +218,8 @@ public class EntityListener implements Listener {
     }
 
     private String locationToString(Location loc) {
-        if (loc == null) return "null_location";
+        if (loc == null)
+            return "null_location";
         String worldName = (loc.getWorld() != null) ? loc.getWorld().getName() : "unknown_world";
         return worldName +
                 String.format(", X:%.1f, Y:%.1f, Z:%.1f", loc.getX(), loc.getY(), loc.getZ());

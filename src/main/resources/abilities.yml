@@ -1,0 +1,28 @@
+# 🦅 Ability Limiter Configuration
+# Prevent abuse of game mechanics that can cause lag or imbalance.
+
+enabled: true
+
+# 🚀 Elytra Settings
+elytra:
+  # Limit flight speed (blocks per second)
+  # High speeds generate too many chunks too fast
+  speed-limit: 1.5 # Multiplier of normal speed
+  
+  # Action when speeding
+  action: "rubberband" # Options: rubberband, cancel, damage
+  
+  # Check interval (ticks)
+  check-interval: 10
+
+# 🔱 Trident Settings
+trident:
+  # Cooldown between Riptide launches (milliseconds)
+  riptide-cooldown: 2000
+  
+  # Disable Riptide entirely?
+  disable-riptide: false
+
+# 🌍 World Settings
+disabled-worlds:
+  - "creative_world"

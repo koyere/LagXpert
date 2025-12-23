@@ -20,7 +20,7 @@ import me.koyere.lagxpert.tasks.InactiveChunkUnloader;
 import me.koyere.lagxpert.tasks.ItemCleanerTask;
 import me.koyere.lagxpert.utils.ChunkUtils;
 import me.koyere.lagxpert.utils.ConfigManager;
-import me.koyere.lagxpert.utils.MessageManager;
+// import me.koyere.lagxpert.utils.MessageManager; // Unused
 import me.koyere.lagxpert.utils.PlatformDetector;
 import me.koyere.lagxpert.utils.SchedulerWrapper;
 import me.koyere.lagxpert.utils.BedrockPlayerUtils;
@@ -36,9 +36,12 @@ import java.io.File;
 /**
  * Main class for the LagXpert plugin.
  * Handles the initialization and deinitialization of plugin components,
- * including configuration, commands, listeners, tasks, metrics, and Phase 1 & 2 features.
- * Enhanced with performance cache system, async processing, advanced redstone control,
- * entity cleanup functionality, comprehensive TPS monitoring system, smart chunk management,
+ * including configuration, commands, listeners, tasks, metrics, and Phase 1 & 2
+ * features.
+ * Enhanced with performance cache system, async processing, advanced redstone
+ * control,
+ * entity cleanup functionality, comprehensive TPS monitoring system, smart
+ * chunk management,
  * per-world configuration system, and GUI configuration system.
  */
 public class LagXpert extends JavaPlugin {
@@ -46,6 +49,7 @@ public class LagXpert extends JavaPlugin {
     private static LagXpert instance;
     private static final int BSTATS_PLUGIN_ID = 25746; // bStats Plugin ID for metrics.
     private Metrics bStatsInstance; // Store the bStats Metrics instance
+    private me.koyere.lagxpert.system.ConsoleFilter consoleFilter;
 
     /**
      * Returns the static instance of this plugin.
@@ -63,35 +67,35 @@ public class LagXpert extends JavaPlugin {
 
         // Phase 0: Platform Detection and Core Setup
         initializePlatformDetection();
-        
+
         saveDefaultConfigurations();
-        
+
         // NEW v2.2: Migrate configurations from older versions
         ConfigMigrator.migrateConfigurations();
-        
+
         createPerWorldConfigurationStructure(); // NEW: Create per-world config structure
         loadPluginLogic();
         registerCommandsAndListeners();
         schedulePluginTasks();
-        
+
         // Phase 1: Core systems
         initializeAdvancedSystems(); // Phase 1 systems
-        
-        // Phase 2: Advanced systems  
+
+        // Phase 2: Advanced systems
         initializeMonitoringSystems(); // Phase 2 systems
         initializeChunkManagementSystems(); // Phase 2 chunk management
         initializeSmartMobManagement(); // NEW: Smart mob management
         initializeGUISystem(); // Phase 2 GUI system
         initializeMetrics(); // Initialize bStats and custom charts
 
-        getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully on " + 
-                        PlatformDetector.getPlatformSummary() + " with multi-platform compatibility.");
+        getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully on " +
+                PlatformDetector.getPlatformSummary() + " with multi-platform compatibility.");
     }
 
     @Override
     public void onDisable() {
         // Shutdown systems in reverse order of initialization
-        
+
         // Shutdown GUI system gracefully
         shutdownGUISystem();
 
@@ -101,11 +105,17 @@ public class LagXpert extends JavaPlugin {
         shutdownMonitoringSystems();
 
         // Shutdown Phase 1 systems gracefully
+        // Shutdown Phase 1 systems gracefully
         shutdownAdvancedSystems();
+
+        // Shutdown ConsoleFilter
+        if (consoleFilter != null) {
+            consoleFilter.shutdown();
+        }
 
         // Cancel all tasks using cross-platform scheduler
         SchedulerWrapper.cancelAllTasks();
-        
+
         // Fallback: Cancel any remaining Bukkit tasks
         Bukkit.getScheduler().cancelTasks(this);
 
@@ -113,9 +123,12 @@ public class LagXpert extends JavaPlugin {
     }
 
     /**
-     * Saves all default configuration files from the JAR to the plugin's data folder
-     * if they do not already exist. This ensures users have the default configs on first run.
-     * Enhanced to include Phase 1 & 2 configuration files and prevent unnecessary warnings.
+     * Saves all default configuration files from the JAR to the plugin's data
+     * folder
+     * if they do not already exist. This ensures users have the default configs on
+     * first run.
+     * Enhanced to include Phase 1 & 2 configuration files and prevent unnecessary
+     * warnings.
      */
     private void saveDefaultConfigurations() {
         // Save config.yml (always handled by saveDefaultConfig())
@@ -131,8 +144,8 @@ public class LagXpert extends JavaPlugin {
                 "messages.yml",
                 "itemcleaner.yml",
                 "entitycleanup.yml", // Phase 1 entity cleanup config
-                "monitoring.yml",    // Phase 2 monitoring config
-                "chunks.yml"         // Phase 2 chunk management config
+                "monitoring.yml", // Phase 2 monitoring config
+                "chunks.yml" // Phase 2 chunk management config
         };
 
         // Only save files that don't exist to prevent warnings
@@ -149,8 +162,10 @@ public class LagXpert extends JavaPlugin {
     }
 
     /**
-     * Creates the per-world configuration structure and example world configuration files.
-     * This method creates the worlds/ folder and example configuration files for standard worlds.
+     * Creates the per-world configuration structure and example world configuration
+     * files.
+     * This method creates the worlds/ folder and example configuration files for
+     * standard worlds.
      * NEW: Per-world configuration system setup.
      */
     private void createPerWorldConfigurationStructure() {
@@ -161,7 +176,8 @@ public class LagXpert extends JavaPlugin {
                 if (worldsFolder.mkdirs()) {
                     getLogger().info("[LagXpert] Created per-world configuration folder: " + worldsFolder.getPath());
                 } else {
-                    getLogger().warning("[LagXpert] Failed to create per-world configuration folder: " + worldsFolder.getPath());
+                    getLogger().warning(
+                            "[LagXpert] Failed to create per-world configuration folder: " + worldsFolder.getPath());
                     return;
                 }
             }
@@ -186,7 +202,7 @@ public class LagXpert extends JavaPlugin {
      * Uses the resource files from the JAR as templates.
      *
      * @param worldsFolder The worlds configuration folder
-     * @param fileName The configuration file name (e.g., "world.yml")
+     * @param fileName     The configuration file name (e.g., "world.yml")
      */
     private void createExampleWorldConfig(File worldsFolder, String fileName) {
         File worldConfigFile = new File(worldsFolder, fileName);
@@ -224,7 +240,8 @@ public class LagXpert extends JavaPlugin {
                 }
 
             } catch (Exception e) {
-                getLogger().warning("[LagXpert] Failed to create world configuration " + fileName + ": " + e.getMessage());
+                getLogger()
+                        .warning("[LagXpert] Failed to create world configuration " + fileName + ": " + e.getMessage());
                 // Fallback: create a basic template
                 createBasicWorldConfigTemplate(worldConfigFile, fileName);
             }
@@ -236,7 +253,7 @@ public class LagXpert extends JavaPlugin {
      * Used as fallback when resource files are not available.
      *
      * @param configFile The configuration file to create
-     * @param fileName The name of the configuration file
+     * @param fileName   The name of the configuration file
      */
     private void createBasicWorldConfigTemplate(File configFile, String fileName) {
         try {
@@ -245,8 +262,10 @@ public class LagXpert extends JavaPlugin {
 
             content.append("# LagXpert - Per-World Configuration for: ").append(worldName).append("\n");
             content.append("# This file allows you to override global settings for this specific world.\n");
-            content.append("# Only include settings you want to override - missing settings will use global defaults.\n");
-            content.append("# You can copy any setting from the main config files (mobs.yml, storage.yml, etc.) here.\n");
+            content.append(
+                    "# Only include settings you want to override - missing settings will use global defaults.\n");
+            content.append(
+                    "# You can copy any setting from the main config files (mobs.yml, storage.yml, etc.) here.\n");
             content.append("#\n");
             content.append("# Example overrides:\n");
             content.append("# limits:\n");
@@ -320,14 +339,16 @@ public class LagXpert extends JavaPlugin {
             }
 
         } catch (Exception e) {
-            getLogger().warning("[LagXpert] Failed to create basic world configuration template " + fileName + ": " + e.getMessage());
+            getLogger().warning("[LagXpert] Failed to create basic world configuration template " + fileName + ": "
+                    + e.getMessage());
         }
     }
 
     /**
      * Loads essential plugin data and configurations into memory.
      * ConfigManager.loadAll() is responsible for loading all YAML files
-     * and initializing other managers like MessageManager with their respective configs.
+     * and initializing other managers like MessageManager with their respective
+     * configs.
      * Now includes WorldConfigManager initialization.
      */
     private void loadPluginLogic() {
@@ -347,7 +368,8 @@ public class LagXpert extends JavaPlugin {
         getCommand("chunkstatus").setExecutor(new ChunkStatusCommand());
         getCommand("abyss").setExecutor(new AbyssCommand());
         getCommand("clearitems").setExecutor(new ClearItemsCommand());
-        getCommand("clearitems").setTabCompleter(new ClearItemsCommand()); // Assuming ClearItemsCommand also implements TabCompleter
+        getCommand("clearitems").setTabCompleter(new ClearItemsCommand()); // Assuming ClearItemsCommand also implements
+                                                                           // TabCompleter
 
         // Register GUI command
         getCommand("lagxpertgui").setExecutor(new LagXpertGUICommand());
@@ -368,7 +390,7 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isMobsModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new EntityListener(), this);
         }
-        
+
         // Register ItemCleanerListener for enhanced broken block tracking
         if (ConfigManager.isItemCleanerModuleEnabled()) {
             getServer().getPluginManager().registerEvents(new ItemCleanerListener(), this);
@@ -377,11 +399,23 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isChunkManagementModuleEnabled() && ConfigManager.isChunkActivityTrackingEnabled()) {
             getServer().getPluginManager().registerEvents(new ChunkActivityListener(), this);
         }
+
+        // Phase 2: Register ExplosionController/VehicleManager/AbilityLimiter
+        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.ExplosionController(), this);
+        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.VehicleManager(), this);
+        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.AbilityLimiter(), this);
+
+        // ConsoleFilter is self-initializing its injection in constructor, or use a
+        // manager?
+        // Let's instantiate it to load config and inject.
+        // Storing reference might be good for shutdown.
+        consoleFilter = new me.koyere.lagxpert.system.ConsoleFilter();
     }
 
     /**
      * Schedules all recurring tasks for the plugin.
-     * Tasks like chunk scanning, item cleaning, entity cleanup, and monitoring are started if enabled in the configuration.
+     * Tasks like chunk scanning, item cleaning, entity cleanup, and monitoring are
+     * started if enabled in the configuration.
      * Enhanced with Phase 1 & 2 tasks.
      */
     private void schedulePluginTasks() {
@@ -413,7 +447,8 @@ public class LagXpert extends JavaPlugin {
             new EntityCleanupTask().runTaskTimer(this, entityCleanupInitialDelay, entityCleanupInterval);
 
             if (ConfigManager.isDebugEnabled()) {
-                getLogger().info("[LagXpert] EntityCleanupTask scheduled with interval: " + entityCleanupInterval + " ticks");
+                getLogger().info(
+                        "[LagXpert] EntityCleanupTask scheduled with interval: " + entityCleanupInterval + " ticks");
             }
         }
 
@@ -423,7 +458,8 @@ public class LagXpert extends JavaPlugin {
                 new ChunkActivityCleanupTask().runTaskTimer(this, cleanupInterval, cleanupInterval);
 
                 if (ConfigManager.isDebugEnabled()) {
-                    getLogger().info("[LagXpert] ChunkActivityCleanupTask scheduled with interval: " + cleanupInterval + " ticks");
+                    getLogger().info("[LagXpert] ChunkActivityCleanupTask scheduled with interval: " + cleanupInterval
+                            + " ticks");
                 }
             }
         }
@@ -458,13 +494,15 @@ public class LagXpert extends JavaPlugin {
     }
 
     /**
-     * Initializes Phase 2 monitoring systems for TPS, memory, and performance tracking.
+     * Initializes Phase 2 monitoring systems for TPS, memory, and performance
+     * tracking.
      * NEW: Comprehensive monitoring with real-time alerts and analytics.
      */
     private void initializeMonitoringSystems() {
         if (!ConfigManager.isMonitoringModuleEnabled()) {
             if (ConfigManager.isDebugEnabled()) {
-                getLogger().info("[LagXpert] Monitoring module is disabled, skipping monitoring system initialization.");
+                getLogger()
+                        .info("[LagXpert] Monitoring module is disabled, skipping monitoring system initialization.");
             }
             return;
         }
@@ -482,10 +520,14 @@ public class LagXpert extends JavaPlugin {
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] Monitoring systems initialized successfully:");
-                getLogger().info("  - TPS Monitoring: " + (ConfigManager.isTPSMonitoringEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Memory Monitoring: " + (ConfigManager.isMemoryMonitoringEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Chunk Monitoring: " + (ConfigManager.isChunkMonitoringEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Lag Detection: " + (ConfigManager.isLagDetectionEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info(
+                        "  - TPS Monitoring: " + (ConfigManager.isTPSMonitoringEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info("  - Memory Monitoring: "
+                        + (ConfigManager.isMemoryMonitoringEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info(
+                        "  - Chunk Monitoring: " + (ConfigManager.isChunkMonitoringEnabled() ? "Enabled" : "Disabled"));
+                getLogger()
+                        .info("  - Lag Detection: " + (ConfigManager.isLagDetectionEnabled() ? "Enabled" : "Disabled"));
             }
 
         } catch (Exception e) {
@@ -502,7 +544,7 @@ public class LagXpert extends JavaPlugin {
         try {
             // Detect server platform (Folia, Paper, Spigot, Bukkit)
             PlatformDetector.detectPlatform();
-            
+
             // Initialize platform-specific schedulers
             if (PlatformDetector.isFolia()) {
                 SchedulerWrapper.initializeFoliaSchedulers();
@@ -510,22 +552,25 @@ public class LagXpert extends JavaPlugin {
             } else {
                 getLogger().info("[LagXpert] Using standard Bukkit scheduler");
             }
-            
+
             // Initialize Bedrock player detection
             BedrockPlayerUtils.initializeBedrockAPIs();
-            
+
             // Initialize cross-platform GUI system
             BedrockCompatibleGUI.initializeTemplates();
-            
+
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] Platform detection completed:");
                 getLogger().info("  - Server Platform: " + PlatformDetector.getPlatformType().getDisplayName());
-                getLogger().info("  - Bedrock Support: " + (BedrockPlayerUtils.hasBedrockSupport() ? "Available" : "Not Available"));
-                getLogger().info("  - Scheduler Type: " + (PlatformDetector.isFolia() ? "Region-based (Folia)" : "Global (Bukkit)"));
+                getLogger().info("  - Bedrock Support: "
+                        + (BedrockPlayerUtils.hasBedrockSupport() ? "Available" : "Not Available"));
+                getLogger().info("  - Scheduler Type: "
+                        + (PlatformDetector.isFolia() ? "Region-based (Folia)" : "Global (Bukkit)"));
             }
-            
+
         } catch (Exception e) {
-            getLogger().warning("[LagXpert] Platform detection failed, using fallback compatibility: " + e.getMessage());
+            getLogger()
+                    .warning("[LagXpert] Platform detection failed, using fallback compatibility: " + e.getMessage());
         }
     }
 
@@ -544,7 +589,7 @@ public class LagXpert extends JavaPlugin {
         try {
             SmartMobManager.getInstance().startManagement();
             getLogger().info("[LagXpert] Smart mob management system initialized.");
-            
+
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] Smart mob management configuration:");
                 getLogger().info("  - Scan Interval: " + ConfigManager.getMobScanIntervalTicks() + " ticks");
@@ -553,7 +598,7 @@ public class LagXpert extends JavaPlugin {
                 getLogger().info("  - Protect Tamed: " + ConfigManager.shouldProtectTamedMobs());
                 getLogger().info("  - Protect Equipped: " + ConfigManager.shouldProtectEquippedMobs());
             }
-            
+
         } catch (Exception e) {
             getLogger().severe("[LagXpert] Failed to initialize smart mob management: " + e.getMessage());
             e.printStackTrace();
@@ -562,12 +607,14 @@ public class LagXpert extends JavaPlugin {
 
     /**
      * Initializes Phase 2 smart chunk management systems.
-     * NEW: Intelligent chunk loading/unloading with activity tracking and preloading.
+     * NEW: Intelligent chunk loading/unloading with activity tracking and
+     * preloading.
      */
     private void initializeChunkManagementSystems() {
         if (!ConfigManager.isChunkManagementModuleEnabled()) {
             if (ConfigManager.isDebugEnabled()) {
-                getLogger().info("[LagXpert] Chunk management module is disabled, skipping chunk management system initialization.");
+                getLogger().info(
+                        "[LagXpert] Chunk management module is disabled, skipping chunk management system initialization.");
             }
             return;
         }
@@ -593,11 +640,16 @@ public class LagXpert extends JavaPlugin {
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] Chunk management systems initialized successfully:");
-                getLogger().info("  - Auto Unloading: " + (ConfigManager.isAutoUnloadEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Chunk Preloading: " + (ConfigManager.isChunkPreloadEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Activity Tracking: " + (ConfigManager.isChunkActivityTrackingEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Directional Preloading: " + (ConfigManager.isDirectionalPreloadingEnabled() ? "Enabled" : "Disabled"));
-                getLogger().info("  - Per-World Settings: " + (ConfigManager.isPerWorldSettingsEnabled() ? "Enabled" : "Disabled"));
+                getLogger()
+                        .info("  - Auto Unloading: " + (ConfigManager.isAutoUnloadEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info(
+                        "  - Chunk Preloading: " + (ConfigManager.isChunkPreloadEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info("  - Activity Tracking: "
+                        + (ConfigManager.isChunkActivityTrackingEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info("  - Directional Preloading: "
+                        + (ConfigManager.isDirectionalPreloadingEnabled() ? "Enabled" : "Disabled"));
+                getLogger().info("  - Per-World Settings: "
+                        + (ConfigManager.isPerWorldSettingsEnabled() ? "Enabled" : "Disabled"));
             }
 
         } catch (Exception e) {
@@ -740,9 +792,11 @@ public class LagXpert extends JavaPlugin {
 
     /**
      * Gets performance statistics from all Phase 1 & 2 systems.
-     * Enhanced to include monitoring system, chunk management, GUI system, and per-world configuration statistics.
+     * Enhanced to include monitoring system, chunk management, GUI system, and
+     * per-world configuration statistics.
      *
-     * @return Map containing performance statistics from cache, async, circuit, monitoring, chunk management, GUI, and per-world systems
+     * @return Map containing performance statistics from cache, async, circuit,
+     *         monitoring, chunk management, GUI, and per-world systems
      */
     public static java.util.Map<String, Object> getPerformanceStatistics() {
         java.util.Map<String, Object> stats = new java.util.HashMap<>();
@@ -794,7 +848,8 @@ public class LagXpert extends JavaPlugin {
 
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error collecting performance statistics: " + e.getMessage());
+                getInstance().getLogger()
+                        .warning("[LagXpert] Error collecting performance statistics: " + e.getMessage());
             }
         }
 
@@ -803,7 +858,8 @@ public class LagXpert extends JavaPlugin {
 
     /**
      * Resets all performance statistics counters.
-     * Enhanced to include monitoring system, chunk management, GUI system, and per-world configuration statistics.
+     * Enhanced to include monitoring system, chunk management, GUI system, and
+     * per-world configuration statistics.
      */
     public static void resetPerformanceStatistics() {
         try {
@@ -831,7 +887,8 @@ public class LagXpert extends JavaPlugin {
             }
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error resetting performance statistics: " + e.getMessage());
+                getInstance().getLogger()
+                        .warning("[LagXpert] Error resetting performance statistics: " + e.getMessage());
             }
         }
     }
@@ -857,7 +914,8 @@ public class LagXpert extends JavaPlugin {
     /**
      * Gets a comprehensive server performance report.
      * NEW: Provides formatted performance summary for commands and APIs.
-     * Enhanced with chunk management, GUI system, and per-world configuration information.
+     * Enhanced with chunk management, GUI system, and per-world configuration
+     * information.
      *
      * @return Formatted string with current server performance data
      */
@@ -870,7 +928,8 @@ public class LagXpert extends JavaPlugin {
             StringBuilder report = new StringBuilder();
             report.append("=== LagXpert Performance Report ===\n");
             report.append("TPS: ").append(String.format("%.2f", TPSMonitor.getCurrentTPS())).append("/20.00\n");
-            report.append("Memory: ").append(String.format("%.1f%%", PerformanceTracker.getCurrentMemoryUsage())).append("\n");
+            report.append("Memory: ").append(String.format("%.1f%%", PerformanceTracker.getCurrentMemoryUsage()))
+                    .append("\n");
             report.append("Chunks: ").append(PerformanceTracker.getTotalChunksLoaded()).append(" loaded\n");
             report.append("Avg Tick: ").append(String.format("%.2f", TPSMonitor.getAverageTickTime())).append("ms\n");
             report.append("Lag Spikes: ").append(TPSMonitor.getRecentLagSpikes().size()).append(" recent\n");
@@ -880,7 +939,8 @@ public class LagXpert extends JavaPlugin {
                 java.util.Map<String, Object> chunkStats = ChunkManager.getStatistics();
                 report.append("Chunk Management: ");
                 report.append("Unloaded: ").append(chunkStats.getOrDefault("total_chunks_unloaded", 0));
-                report.append(", Preloaded: ").append(chunkStats.getOrDefault("total_chunks_preloaded", 0)).append("\n");
+                report.append(", Preloaded: ").append(chunkStats.getOrDefault("total_chunks_preloaded", 0))
+                        .append("\n");
             }
 
             // Add GUI system information if enabled
@@ -929,14 +989,16 @@ public class LagXpert extends JavaPlugin {
             }
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error triggering manual chunk management: " + e.getMessage());
+                getInstance().getLogger()
+                        .warning("[LagXpert] Error triggering manual chunk management: " + e.getMessage());
             }
         }
     }
 
     /**
      * Opens the GUI configuration interface for a player.
-     * NEW: Provides programmatic access to GUI system for other plugins or commands.
+     * NEW: Provides programmatic access to GUI system for other plugins or
+     * commands.
      *
      * @param player The player to open the GUI for
      * @return true if the GUI was opened successfully
@@ -953,7 +1015,8 @@ public class LagXpert extends JavaPlugin {
             return GUIManager.getInstance().openConfigGUI(player);
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error opening configuration GUI for " + player.getName() + ": " + e.getMessage());
+                getInstance().getLogger().warning(
+                        "[LagXpert] Error opening configuration GUI for " + player.getName() + ": " + e.getMessage());
             }
             return false;
         }
@@ -961,7 +1024,8 @@ public class LagXpert extends JavaPlugin {
 
     /**
      * Closes any open GUI for a player.
-     * NEW: Provides programmatic access to close GUIs for other plugins or commands.
+     * NEW: Provides programmatic access to close GUIs for other plugins or
+     * commands.
      *
      * @param player The player whose GUI should be closed
      */
@@ -974,7 +1038,8 @@ public class LagXpert extends JavaPlugin {
             GUIManager.getInstance().closeGUI(player);
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error closing configuration GUI for " + player.getName() + ": " + e.getMessage());
+                getInstance().getLogger().warning(
+                        "[LagXpert] Error closing configuration GUI for " + player.getName() + ": " + e.getMessage());
             }
         }
     }
@@ -983,7 +1048,8 @@ public class LagXpert extends JavaPlugin {
      * Gets GUI system statistics.
      * NEW: Provides information about active GUI sessions and usage.
      *
-     * @return Map containing GUI system statistics, or empty map if system is not initialized
+     * @return Map containing GUI system statistics, or empty map if system is not
+     *         initialized
      */
     public static java.util.Map<String, Object> getGUISystemStatistics() {
         if (!GUIManager.isInitialized()) {
@@ -994,7 +1060,8 @@ public class LagXpert extends JavaPlugin {
             return GUIManager.getInstance().getSessionStatistics();
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error collecting GUI system statistics: " + e.getMessage());
+                getInstance().getLogger()
+                        .warning("[LagXpert] Error collecting GUI system statistics: " + e.getMessage());
             }
             return new java.util.HashMap<>();
         }
@@ -1038,7 +1105,8 @@ public class LagXpert extends JavaPlugin {
             }
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error reloading per-world configurations: " + e.getMessage());
+                getInstance().getLogger()
+                        .warning("[LagXpert] Error reloading per-world configurations: " + e.getMessage());
             }
         }
     }
@@ -1071,7 +1139,8 @@ public class LagXpert extends JavaPlugin {
             return created;
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error creating world configuration for " + worldName + ": " + e.getMessage());
+                getInstance().getLogger().warning(
+                        "[LagXpert] Error creating world configuration for " + worldName + ": " + e.getMessage());
             }
             return false;
         }
@@ -1095,7 +1164,8 @@ public class LagXpert extends JavaPlugin {
             return deleted;
         } catch (Exception e) {
             if (getInstance() != null) {
-                getInstance().getLogger().warning("[LagXpert] Error deleting world configuration for " + worldName + ": " + e.getMessage());
+                getInstance().getLogger().warning(
+                        "[LagXpert] Error deleting world configuration for " + worldName + ": " + e.getMessage());
             }
             return false;
         }

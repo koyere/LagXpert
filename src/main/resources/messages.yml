@@ -140,6 +140,11 @@ alerts:
     # Lag Spike Alert Messages
     lag-spike: "&c[LAG SPIKE] &fDetected lag spike: &c{tick_time}ms&f tick duration"
 
+    # LagShield Messages
+    lagshield:
+      activated: "&c[LagShield] &7Performance Critical! &cTurning on emergency protections."
+      deactivated: "&a[LagShield] &7Performance Stabilized. &aRestoring normal operations."
+
 # == /lagxpert chunkload Redirect Message ==
 chunkload:
   use-chunkstatus-command: "&ePlease use the standalone command: &b/chunkstatus &eto view chunk information."

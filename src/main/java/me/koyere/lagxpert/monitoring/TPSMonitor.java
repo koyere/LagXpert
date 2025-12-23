@@ -1,6 +1,7 @@
 package me.koyere.lagxpert.monitoring;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.system.LagShield; // Import LagShield
 import me.koyere.lagxpert.utils.ConfigManager;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -14,8 +15,10 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Real-time TPS (Ticks Per Second) monitoring system that tracks server performance,
- * calculates TPS averages over different time windows, and provides detailed statistics.
+ * Real-time TPS (Ticks Per Second) monitoring system that tracks server
+ * performance,
+ * calculates TPS averages over different time windows, and provides detailed
+ * statistics.
  * Designed to be lightweight and accurate for continuous monitoring.
  */
 public class TPSMonitor extends BukkitRunnable {
@@ -30,9 +33,9 @@ public class TPSMonitor extends BukkitRunnable {
     private final Queue<TickData> tickHistory = new ArrayDeque<>();
 
     // TPS calculation windows (configured values)
-    private int shortTermWindow;   // 1 minute default
-    private int mediumTermWindow;  // 5 minutes default
-    private int longTermWindow;    // 15 minutes default
+    private int shortTermWindow; // 1 minute default
+    private int mediumTermWindow; // 5 minutes default
+    private int longTermWindow; // 15 minutes default
 
     // Current TPS values
     private volatile double currentTPS = TARGET_TPS;
@@ -62,8 +65,13 @@ public class TPSMonitor extends BukkitRunnable {
             this.tickTime = tickTime;
         }
 
-        public long getTimestamp() { return timestamp; }
-        public double getTickTime() { return tickTime; }
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public double getTickTime() {
+            return tickTime;
+        }
     }
 
     /**
@@ -82,10 +90,21 @@ public class TPSMonitor extends BukkitRunnable {
             this.possibleCause = possibleCause;
         }
 
-        public long getTimestamp() { return timestamp; }
-        public double getDuration() { return duration; }
-        public double getTickTime() { return tickTime; }
-        public String getPossibleCause() { return possibleCause; }
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public double getDuration() {
+            return duration;
+        }
+
+        public double getTickTime() {
+            return tickTime;
+        }
+
+        public String getPossibleCause() {
+            return possibleCause;
+        }
     }
 
     /**
@@ -97,6 +116,7 @@ public class TPSMonitor extends BukkitRunnable {
 
     /**
      * Gets or creates the singleton instance of TPSMonitor.
+     * 
      * @return The TPSMonitor instance
      */
     public static TPSMonitor getInstance() {
@@ -119,7 +139,8 @@ public class TPSMonitor extends BukkitRunnable {
         instance.runTaskTimer(LagXpert.getInstance(), 1L, updateInterval);
 
         if (ConfigManager.isDebugEnabled()) {
-            LagXpert.getInstance().getLogger().info("[TPSMonitor] TPS monitoring started with update interval: " + updateInterval + " ticks");
+            LagXpert.getInstance().getLogger()
+                    .info("[TPSMonitor] TPS monitoring started with update interval: " + updateInterval + " ticks");
         }
     }
 
@@ -175,12 +196,21 @@ public class TPSMonitor extends BukkitRunnable {
         // Detect and handle lag spikes
         detectLagSpikes(tickTimeMs, timestampSeconds);
 
+        // Calculate Memory Usage for LagShield
+        long maxMemory = Runtime.getRuntime().maxMemory();
+        long totalMemory = Runtime.getRuntime().totalMemory();
+        long freeMemory = Runtime.getRuntime().freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+        double memoryUsagePercent = (maxMemory > 0) ? ((double) usedMemory / maxMemory) * 100.0 : 0.0;
+
+        // Update LagShield
+        LagShield.getInstance().onTick(currentTPS, memoryUsagePercent);
+
         // Log debug information if enabled
         if (ConfigManager.shouldLogTPSCalculations()) {
             LagXpert.getInstance().getLogger().info(
                     String.format("[TPSMonitor] Current: %.2f, 1m: %.2f, 5m: %.2f, 15m: %.2f, Tick: %.2fms",
-                            currentTPS, shortTermTPS, mediumTermTPS, longTermTPS, tickTimeMs)
-            );
+                            currentTPS, shortTermTPS, mediumTermTPS, longTermTPS, tickTimeMs));
         }
     }
 
@@ -223,6 +253,7 @@ public class TPSMonitor extends BukkitRunnable {
 
     /**
      * Calculates TPS for a specific time window.
+     * 
      * @param windowSeconds The time window in seconds
      * @return The calculated TPS for the window
      */
@@ -270,7 +301,8 @@ public class TPSMonitor extends BukkitRunnable {
 
             // Create lag spike record
             String possibleCause = analyzeLagSpikeCause(tickTimeMs);
-            LagSpike spike = new LagSpike(timestamp * 1000, tickTimeMs - TARGET_TICK_TIME_NS / 1_000_000.0, tickTimeMs, possibleCause);
+            LagSpike spike = new LagSpike(timestamp * 1000, tickTimeMs - TARGET_TICK_TIME_NS / 1_000_000.0, tickTimeMs,
+                    possibleCause);
 
             // Store lag spike (with size limit)
             synchronized (recentLagSpikes) {
@@ -290,8 +322,7 @@ public class TPSMonitor extends BukkitRunnable {
             if (ConfigManager.isDebugEnabled()) {
                 LagXpert.getInstance().getLogger().warning(
                         String.format("[TPSMonitor] Lag spike detected! Tick time: %.2fms, Consecutive: %d, Cause: %s",
-                                tickTimeMs, consecutiveLagSpikes, possibleCause)
-                );
+                                tickTimeMs, consecutiveLagSpikes, possibleCause));
             }
         } else {
             consecutiveLagSpikes = 0; // Reset consecutive counter
@@ -300,6 +331,7 @@ public class TPSMonitor extends BukkitRunnable {
 
     /**
      * Analyzes potential causes of lag spikes.
+     * 
      * @param tickTimeMs The tick time that caused the lag spike
      * @return A string describing the possible cause
      */
@@ -364,6 +396,7 @@ public class TPSMonitor extends BukkitRunnable {
 
     /**
      * Gets comprehensive TPS statistics.
+     * 
      * @return A formatted string with TPS information
      */
     public static String getTPSReport() {
@@ -376,8 +409,7 @@ public class TPSMonitor extends BukkitRunnable {
                         "Tick: Avg: %.2fms, Max: %.2fms, Min: %.2fms | " +
                         "Total Ticks: %d",
                 getCurrentTPS(), getShortTermTPS(), getMediumTermTPS(), getLongTermTPS(),
-                getAverageTickTime(), getMaxTickTime(), getMinTickTime(), getTotalTicks()
-        );
+                getAverageTickTime(), getMaxTickTime(), getMinTickTime(), getTotalTicks());
     }
 
     /**

@@ -1,0 +1,22 @@
+# 🚫 Console Filter Configuration
+# Hide unwanted spam messages from your server console.
+
+enabled: true
+
+# 📋 Filters
+# List of Regex patterns to hide.
+# Be careful! Hiding critical errors or important info can make debugging hard.
+filters:
+  # Example: Hide "Moved too quickly" spam (common with Elytra/lag)
+  - ".*moved too quickly!.*"
+  
+  # Example: Hide "Unknown command" spam
+  - ".*Unknown command.*"
+  
+  # Example: Hide specific plugin spam
+  # - ".*\[SomeSpammyPlugin\].*"
+
+# 📡 Forwarding
+# Forward filtered messages to admins via in-game chat instead of console?
+forward-to-admins: false
+forward-permission: "lagxpert.console.view-filtered"

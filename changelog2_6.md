@@ -5,45 +5,34 @@ Bring LagXpert on par (or beyond) with competing optimisation suites by introduc
 
 ## Planned Modules & Enhancements
 - **MobAIOptimizer**
-  - Disable or replace costly pathfinders per entity type.
-  - Allow per-world and per-mob configuration with graceful fallbacks.
-  - Expose configurable messages for state toggles and admin notifications.
+  - [COMPLETED] `src/main/resources/mobs.yml`: Agregar sección `ai-optimizer` para configurar desactivación de IA por tipo de entidad y mundo.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/MobAIOptimizer.java`: Implementar lógica para remover IA (`setAI(false)`) y pathfinders.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/listeners/EntityListener.java`: Integrar hooks en `CreatureSpawnEvent` y `EntityLoadEvent` para aplicar optimizaciones al instante.
 
 - **LagShield**
-  - React to TPS/memory spike thresholds.
-  - Temporarily adjust configured limits (mobs, redstone, scans) and pause heavy tasks.
-  - Broadcast recovery/activation alerts using `messages.yml` entries.
+  - [COMPLETED] `src/main/resources/lagshield.yml`: Configuración de umbrales críticos (TPS < 16, RAM > 90%) y acciones de emergencia (pausar spawns, kill drops).
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/LagShield.java`: Sistema de monitoreo activo que se suscribe a `TPSMonitor`.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/monitoring/TPSMonitor.java`: Disparar eventos de alerta hacia `LagShield` cuando se cruzan los umbrales.
+  - [COMPLETED] `src/main/resources/messages.yml`: Agregar mensajes de alerta y recuperación broadcast.
 
 - **ExplosionController**
-  - Clamp TNT/creeper/end crystal blast radius and chain reactions.
-  - Clean residual drops spawned by chained explosions.
-  - Provide detailed logging hooks and bypass permissions.
+  - [COMPLETED] `src/main/resources/explosions.yml`: Definir radios máximos para TNT/Creeper y toggle para prevención de reacciones en cadena.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/ExplosionController.java`: Listeners para `EntityExplodeEvent` y `BlockExplodeEvent` que modifican `event.yield` y limpian items (`EntityItem`) generados en masa.
 
 - **VehicleManager**
-  - Optimise tick updates for boats/minecarts.
-  - Auto-remove abandoned loot minecarts from mineshafts.
-  - Introduce per-world vehicle caps and alerts.
+  - [COMPLETED] `src/main/resources/vehicles.yml`: Límites de vehículos por chunk/mundo y configuración de limpieza de minas abandonadas.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/VehicleManager.java`: Tarea periódica para escanear y eliminar vagonetas sin pasajero en chunks inactivos. Optimización de eventos de movimiento de vehículos.
 
 - **AbilityLimiter**
-  - Monitor Elytra flight speed and Trident usage.
-  - Apply configurable slowdowns/cooldowns during TPS stress.
-  - Support bypass permissions and player feedback via action bar/chat.
+  - [COMPLETED] `src/main/resources/abilities.yml`: Configuración de velocidad máxima de Elytra y cooldown de Tridentes.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/AbilityLimiter.java`: Monitoreo de `PlayerMoveEvent` para detectar exceso de velocidad en Elytra y corregir (rubberband suave). Monitoreo de `ProjectileLaunchEvent` para tridentes.
 
 - **ConsoleFilter**
-  - YAML-defined rules for suppressing or highlighting console lines.
-  - Optional forwarding to in-game staff via messages.
+  - [COMPLETED] `src/main/resources/console-filter.yml`: Lista de expresiones regulares (Regex) para bloquear mensajes spam.
+  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/ConsoleFilter.java`: Inyectar filtro en `java.util.logging.Logger` raíz del servidor.
 
 ## Infrastructure Updates
-- Extend `messages.yml`, `config.yml` and per-module YAMLs with fully translatable strings.
-- Add metrics counters for each new module (usage, interventions, time spent active).
-- Update GUI and API surfaces to expose new toggles and status indicators.
-
-## Migration Notes
-- Preserve backward compatibility; default behaviour mirrors v2.5 until features are enabled.
-- Provide automated config migration with backups for existing installs.
-
-## QA Checklist
-- Unit/perf tests (where feasible) for pathfinder replacement and lag shield transitions.
-- In-game scenarios covering high-entity farms, TNT cannons, Elytra highways and vehicle spam.
-- Console filtering regression suite to ensure critical errors are never suppressed by default.
+- [MODIFY] `src/main/java/me/koyere/lagxpert/LagXpert.java`: Registrar nuevos Managers y Listeners en `onEnable`.
+- [MODIFY] `src/main/java/me/koyere/lagxpert/utils/ConfigManager.java` & `ConfigMigrator.java`: Soportar carga y migración de los nuevos archivos YAML.
+- [MODIFY] `src/main/java/me/koyere/lagxpert/metrics/MetricsHandler.java`: Agregar gráficos bStats para los nuevos módulos.
 

@@ -1,0 +1,64 @@
+# 🛡️ LagShield Configuration
+# Reactive protection system that dynamically adjusts server limits based on performance.
+
+enabled: true
+
+# 📊 Thresholds
+# Define when the shield should activate or deactivate protection modes.
+thresholds:
+  # TPS thresholds
+  tps:
+    # Activate protection when TPS drops below this value
+    critical: 16.0
+    # Deactivate protection when TPS recovers above this value
+    recovery: 18.5
+    
+  # RAM thresholds (percentage used)
+  ram:
+    # Activate protection when RAM usage exceeds this value
+    critical: 90.0
+    # Deactivate protection when RAM usage drops below this value
+    recovery: 80.0
+
+# ⚡ Actions
+# What should happen when LagShield is active?
+actions:
+  # Pause specific repetitive tasks to save resources
+  pause-tasks:
+    # Pause auto-chunk scanning
+    auto-scan: true
+    # Pause item cleaner task
+    item-cleaner: true
+    # Pause entity cleanup task
+    entity-cleanup: false
+  
+  # Reduce limits temporarily
+  reduce-limits:
+    # Reduce mob cap by this percentage (0.0 - 1.0)
+    # e.g., 0.5 means mob limit becomes 50% of the normal limit
+    mob-cap-multiplier: 0.5
+    
+    # Increase Redstone cooldowns by this multiplier
+    redstone-cooldown-multiplier: 2.0
+    
+  # Emergency cleanup (run once when critical threshold is crossed)
+  emergency-cleanup:
+    enabled: true
+    # Remove all ground items?
+    clear-items: true
+    # Remove hostile mobs?
+    clear-hostiles: false
+    
+  # Prevent new spawns?
+  block-spawns:
+    # Block natural mob spawning
+    natural: true
+    # Block spawner spawning
+    spawner: false
+
+# 📢 Notifications
+notifications:
+  # Broadcast to all players when LagShield activates/deactivates
+  broadcast: true
+  # Permission required to see broadcasts (leave empty for all players)
+  permission: "lagxpert.lagshield.notify"
