@@ -1,38 +1,47 @@
-# LagXpert v2.6 - Competitive Edge Roadmap
+# LagXpert v2.6 - Reactive Optimization & Modular Control
 
-## Vision
-Bring LagXpert on par (or beyond) with competing optimisation suites by introducing proactive AI throttling, dynamic lag shielding and specialised vehicle/explosion limiters while preserving the plugin's modular design and localisation support.
+This update introduces advanced modules for proactive performance management, including AI optimization, lag shields, and specific controls for vehicles and explosions.
 
-## Planned Modules & Enhancements
-- **MobAIOptimizer**
-  - [COMPLETED] `src/main/resources/mobs.yml`: Agregar sección `ai-optimizer` para configurar desactivación de IA por tipo de entidad y mundo.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/MobAIOptimizer.java`: Implementar lógica para remover IA (`setAI(false)`) y pathfinders.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/listeners/EntityListener.java`: Integrar hooks en `CreatureSpawnEvent` y `EntityLoadEvent` para aplicar optimizaciones al instante.
+## 🚀 Highlights
+- **MobAIOptimizer**: Intelligent system that disables AI and pathfinding for mobs in loaded chunks to drastically reduce CPU usage.
+- **LagShield**: Emergency monitor that automatically activates severe restrictions when TPS drops below 16.0 or RAM exceeds 90%.
+- **ExplosionController**: Full control over TNT, Creeper, and Wither explosions. Includes radius limits and prevention of massive chain reactions.
+- **VehicleManager**: Configurable per-chunk limits for minecarts and boats, with automatic cleanup of abandoned vehicles.
+- **AbilityLimiter & ConsoleFilter**: Speed restrictions for Elytras, cooldowns for Tridents, and Regex-based console spam filtering.
 
-- **LagShield**
-  - [COMPLETED] `src/main/resources/lagshield.yml`: Configuración de umbrales críticos (TPS < 16, RAM > 90%) y acciones de emergencia (pausar spawns, kill drops).
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/LagShield.java`: Sistema de monitoreo activo que se suscribe a `TPSMonitor`.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/monitoring/TPSMonitor.java`: Disparar eventos de alerta hacia `LagShield` cuando se cruzan los umbrales.
-  - [COMPLETED] `src/main/resources/messages.yml`: Agregar mensajes de alerta y recuperación broadcast.
+## ⚙️ Configuration Examples
+**`explosions.yml`** - Prevent massive TNT chain reactions:
+```yaml
+settings:
+  prevent-chain-reaction: true
+  max-primed-tnt-per-chunk: 20
+  disable-explosion-drops: false
+```
 
-- **ExplosionController**
-  - [COMPLETED] `src/main/resources/explosions.yml`: Definir radios máximos para TNT/Creeper y toggle para prevención de reacciones en cadena.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/ExplosionController.java`: Listeners para `EntityExplodeEvent` y `BlockExplodeEvent` que modifican `event.yield` y limpian items (`EntityItem`) generados en masa.
+**`vehicles.yml`** - Limit entities per chunk:
+```yaml
+limits:
+  minecarts:
+    per-chunk: 8
+  boats:
+    per-chunk: 5
+```
 
-- **VehicleManager**
-  - [COMPLETED] `src/main/resources/vehicles.yml`: Límites de vehículos por chunk/mundo y configuración de limpieza de minas abandonadas.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/VehicleManager.java`: Tarea periódica para escanear y eliminar vagonetas sin pasajero en chunks inactivos. Optimización de eventos de movimiento de vehículos.
+## 🐛 Bug Fixes & Technical Improvements
+- **Modular Refactoring**: Clean implementation of new systems (`me.koyere.lagxpert.system.*`) with independent configurations.
+- **Compilation Fixes**: Resolved symbol error in `VehicleManager` and cleaned up imports in `AbilityLimiter`.
+- **Secure Integration**: Verified build with Maven (`BUILD SUCCESS`) and ensured correct registration of listeners and commands.
 
-- **AbilityLimiter**
-  - [COMPLETED] `src/main/resources/abilities.yml`: Configuración de velocidad máxima de Elytra y cooldown de Tridentes.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/AbilityLimiter.java`: Monitoreo de `PlayerMoveEvent` para detectar exceso de velocidad en Elytra y corregir (rubberband suave). Monitoreo de `ProjectileLaunchEvent` para tridentes.
+## 📦 Installation & Compatibility
+### Installation
+1.  Stop your server.
+2.  Delete any previous `LagXpert-*.jar` versions.
+3.  Place the new `LagXpert-2.6.jar` in your `/plugins/` folder.
+4.  **Restart the server.** This is required to automatically generate the new configuration files:
+    - `mobs.yml`, `lagshield.yml`, `explosions.yml`, `vehicles.yml`, `abilities.yml`, `console-filter.yml`.
+5.  *Note: While `/lagxpert reload` exists, a full restart is strongly recommended for this update to ensure all new modules initialize correctly.*
 
-- **ConsoleFilter**
-  - [COMPLETED] `src/main/resources/console-filter.yml`: Lista de expresiones regulares (Regex) para bloquear mensajes spam.
-  - [COMPLETED] `src/main/java/me/koyere/lagxpert/system/ConsoleFilter.java`: Inyectar filtro en `java.util.logging.Logger` raíz del servidor.
-
-## Infrastructure Updates
-- [MODIFY] `src/main/java/me/koyere/lagxpert/LagXpert.java`: Registrar nuevos Managers y Listeners en `onEnable`.
-- [MODIFY] `src/main/java/me/koyere/lagxpert/utils/ConfigManager.java` & `ConfigMigrator.java`: Soportar carga y migración de los nuevos archivos YAML.
-- [MODIFY] `src/main/java/me/koyere/lagxpert/metrics/MetricsHandler.java`: Agregar gráficos bStats para los nuevos módulos.
-
+### Compatibility
+- **Versions**: Minecraft 1.16.x - 1.21.x
+- **Platforms**: Spigot, Paper, Purpur, Folia (Experimental support).
+- **Java**: Java 17 or higher recommended.

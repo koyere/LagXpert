@@ -88,7 +88,9 @@ public class AsyncChunkAnalyzer {
         // Getters
         public String getChunkKey() { return chunkKey; }
         public int getLivingEntities() { return livingEntities; }
-        public Map<Material, Integer> getBlockCounts() { return new EnumMap<>(blockCounts); }
+        public Map<Material, Integer> getBlockCounts() {
+            return blockCounts.isEmpty() ? new EnumMap<>(Material.class) : new EnumMap<>(blockCounts);
+        }
         public Map<String, Integer> getCustomCounts() { return new ConcurrentHashMap<>(customCounts); }
         public boolean isSuccess() { return success; }
         public long getAnalysisTimeMs() { return analysisTimeMs; }

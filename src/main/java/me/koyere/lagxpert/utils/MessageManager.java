@@ -10,6 +10,10 @@ import java.util.Map;
 /**
  * Utility class for retrieving and formatting plugin messages.
  * Messages are loaded from a FileConfiguration object, typically messages.yml.
+ *
+ * Supports structured message nodes where each message can have 'full' and 'short'
+ * variants. When a path points to a configuration section, the 'full' sub-key is
+ * resolved automatically for standard retrieval, and 'short' is used for ActionBar.
  */
 public class MessageManager {
 
@@ -32,6 +36,11 @@ public class MessageManager {
      * Gets a raw message string from the loaded configuration by its path,
      * applies color codes, and provides a fallback for missing messages.
      *
+     * Supports structured message nodes: if the path points to a configuration
+     * section (e.g., with 'full' and 'short' sub-keys), the 'full' variant
+     * is returned automatically. This prevents MemorySection objects from
+     * being displayed as raw text.
+     *
      * @param path The path to the message string in messages.yml.
      * @return The color-translated message string, or a "missing message" indicator.
      */
@@ -39,6 +48,14 @@ public class MessageManager {
         if (messagesConfig == null) {
             return ChatColor.translateAlternateColorCodes('&', "&c[LagXpert Error] Messages not loaded! Path: " + path);
         }
+
+        // If the path points to a section (structured node), resolve to '.full'
+        if (messagesConfig.isConfigurationSection(path)) {
+            String fullPath = path + ".full";
+            String rawMessage = messagesConfig.getString(fullPath, "&cMissing message: " + path + "&r");
+            return ChatColor.translateAlternateColorCodes('&', rawMessage);
+        }
+
         String rawMessage = messagesConfig.getString(path, "&cMissing message: " + path + "&r");
         return ChatColor.translateAlternateColorCodes('&', rawMessage);
     }
@@ -52,13 +69,12 @@ public class MessageManager {
      * and values are their replacements (can be any Object, will be converted to String).
      * @return The formatted and color-translated message string.
      */
-    public static String getFormatted(String path, Map<String, Object> replacements) { // MODIFIED: Map<String, Object>
-        String baseMessage = get(path); // get() already handles color translation and missing paths
+    public static String getFormatted(String path, Map<String, Object> replacements) {
+        String baseMessage = get(path); // get() already handles color translation, missing paths, and structured nodes
         if (replacements == null || replacements.isEmpty()) {
             return baseMessage;
         }
-        for (Map.Entry<String, Object> entry : replacements.entrySet()) { // MODIFIED: Map.Entry<String, Object>
-            // Using String.valueOf() to safely convert any object to its string representation.
+        for (Map.Entry<String, Object> entry : replacements.entrySet()) {
             baseMessage = baseMessage.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
         }
         return baseMessage;
@@ -110,7 +126,7 @@ public class MessageManager {
      * @param replacements  A map for placeholder replacements (values can be any Object).
      * @return The prefixed, formatted, and color-translated message string.
      */
-    public static String getPrefixedFormattedMessage(String path, Map<String, Object> replacements) { // MODIFIED: Map<String, Object>
+    public static String getPrefixedFormattedMessage(String path, Map<String, Object> replacements) {
         return getPrefix() + getFormatted(path, replacements);
     }
 
@@ -209,17 +225,31 @@ public class MessageManager {
 
     /**
      * Sends a restriction message to a player using the configured restriction message type.
+     * Automatically selects the short message variant for ActionBar delivery.
      *
      * @param player The player to send the message to.
      * @param path The path to the message in messages.yml.
      */
     public static void sendRestrictionMessage(Player player, String path) {
         MessageType messageType = getRestrictionMessageType();
-        sendPrefixedMessage(player, path, messageType);
+
+        switch (messageType) {
+            case ACTIONBAR:
+                sendMessage(player, getPrefix() + getShortMessage(path), MessageType.ACTIONBAR);
+                break;
+            case BOTH:
+                sendMessage(player, getPrefixedMessage(path), MessageType.CHAT);
+                sendMessage(player, getPrefix() + getShortMessage(path), MessageType.ACTIONBAR);
+                break;
+            default:
+                sendPrefixedMessage(player, path, MessageType.CHAT);
+                break;
+        }
     }
 
     /**
      * Sends a formatted restriction message to a player using the configured restriction message type.
+     * Automatically selects the short message variant for ActionBar delivery.
      *
      * @param player The player to send the message to.
      * @param path The path to the message in messages.yml.
@@ -227,7 +257,31 @@ public class MessageManager {
      */
     public static void sendFormattedRestrictionMessage(Player player, String path, Map<String, Object> replacements) {
         MessageType messageType = getRestrictionMessageType();
-        sendPrefixedFormattedMessage(player, path, replacements, messageType);
+
+        switch (messageType) {
+            case ACTIONBAR:
+                String shortMsg = getShortMessage(path);
+                if (replacements != null) {
+                    for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                        shortMsg = shortMsg.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+                    }
+                }
+                sendMessage(player, getPrefix() + shortMsg, MessageType.ACTIONBAR);
+                break;
+            case BOTH:
+                sendPrefixedFormattedMessage(player, path, replacements, MessageType.CHAT);
+                String shortMsgBoth = getShortMessage(path);
+                if (replacements != null) {
+                    for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                        shortMsgBoth = shortMsgBoth.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+                    }
+                }
+                sendMessage(player, getPrefix() + shortMsgBoth, MessageType.ACTIONBAR);
+                break;
+            default:
+                sendPrefixedFormattedMessage(player, path, replacements, MessageType.CHAT);
+                break;
+        }
     }
 
     /**
@@ -244,14 +298,13 @@ public class MessageManager {
 
         // Strip color codes for length calculation
         String strippedMessage = ChatColor.stripColor(message);
-        
+
         // Truncate message if too long for ActionBar
         if (strippedMessage.length() > ACTIONBAR_MAX_LENGTH) {
-            // Find a good truncation point (preserve color codes)
-            int truncateAt = ACTIONBAR_MAX_LENGTH - 3; // Reserve space for "..."
+            // Reserve space for "..."
+            int truncateAt = ACTIONBAR_MAX_LENGTH - 3;
             String truncated = message;
-            
-            // Simple truncation - could be improved to preserve word boundaries
+
             if (message.length() > truncateAt) {
                 truncated = message.substring(0, truncateAt) + "...";
             }
@@ -268,16 +321,36 @@ public class MessageManager {
 
     /**
      * Gets a shortened version of a message suitable for ActionBar display.
-     * Attempts to get a message from path + ".short" first, then falls back to the full message.
+     * Supports structured message nodes: looks for '.short' sub-key first,
+     * then falls back to '.full', then to the raw path value.
+     * Also supports legacy flat format for backward compatibility.
      *
      * @param path The base path to the message in messages.yml.
      * @return A shortened message suitable for ActionBar.
      */
     public static String getShortMessage(String path) {
-        String shortPath = path + ".short";
-        if (messagesConfig != null && messagesConfig.contains(shortPath)) {
-            return get(shortPath);
+        if (messagesConfig == null) {
+            return get(path);
         }
+
+        // Structured node: path is a section with 'full' and 'short' sub-keys
+        if (messagesConfig.isConfigurationSection(path)) {
+            String shortPath = path + ".short";
+            if (messagesConfig.contains(shortPath)) {
+                return ChatColor.translateAlternateColorCodes('&',
+                        messagesConfig.getString(shortPath, ""));
+            }
+            // Fall back to '.full' within the section
+            return get(path);
+        }
+
+        // Legacy flat format: check for path + ".short" as a sibling key
+        String shortPath = path + ".short";
+        if (messagesConfig.contains(shortPath) && messagesConfig.isString(shortPath)) {
+            return ChatColor.translateAlternateColorCodes('&',
+                    messagesConfig.getString(shortPath, ""));
+        }
+
         return get(path);
     }
 

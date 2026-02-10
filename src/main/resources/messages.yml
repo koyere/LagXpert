@@ -4,6 +4,12 @@
 # Here you can translate and customize all messages LagXpert shows to users.
 # - Use '&' for color codes (e.g., &a for light green, &c for light red).
 # - Placeholders like {placeholder_name} will be replaced with dynamic values by the plugin.
+#
+# Message Structure:
+# Each limit message supports two variants:
+#   full:  The complete message shown in chat.
+#   short: A compact version shown in the action bar.
+# If only a string is provided (no full/short), it will be used for both.
 # ──────────────────────────────────────────────
 
 # Prefix used in most plugin messages.
@@ -57,8 +63,8 @@ inspect:
 
 # == /chunkstatus Command ==
 chunkstatus:
-  info: "&aChunk Information: Mobs: {entities}, Hoppers: {hoppers}..." # Key currently unused by ChunkStatusCommand
-  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks." # Key currently unused by ChunkStatusCommand
+  info: "&aChunk Information: Mobs: {entities}, Hoppers: {hoppers}..."
+  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks."
 
 # == /clearitems Command ==
 clearitems:
@@ -85,40 +91,53 @@ gui:
   reload-failed: "&cFailed to reload GUI system configurations. Check console for errors."
 
 # == Limit Alerts (Used by Listeners and Tasks) ==
-# CORRECTED: Keys are now singular to match StorageListener.java expectations.
+# Each message has a 'full' version (for chat) and a 'short' version (for action bar).
 limits:
-  mobs: "&cMob limit reached in this chunk!"
-  hopper: "&cHopper limit reached in this chunk!" # Singular key
-  chest: "&cChest limit reached in this chunk!" # Singular key (covers trapped too)
-  furnace: "&cFurnace limit reached in this chunk!" # Singular key
-  blast_furnace: "&cBlast furnace limit reached in this chunk!" # Singular key
-  smoker: "&cSmoker limit reached in this chunk!" # Singular key
-  barrel: "&cBarrel limit reached in this chunk!" # Singular key
-  dropper: "&cDropper limit reached in this chunk!" # Singular key
-  dispenser: "&cDispenser limit reached in this chunk!" # Singular key
-  shulker_box: "&cShulker box limit reached in this chunk!" # Singular key
-  tnt: "&cTNT limit reached in this chunk!" # Singular key
-  piston: "&cPiston limit reached in this chunk!" # Singular key (covers sticky too)
-  observer: "&cObserver limit reached in this chunk!" # Singular key
-  redstone: "&cRedstone component forcibly disabled (lag prevention)."
-  near-limit: "&e[!] Warning: Chunk is nearing its limit for &f{type}&e (&f{used}&7/&f{max}&e)." # Placeholder {type}
-  
-  # Short versions for ActionBar (optional - fallback to main message if not present)
-  mobs.short: "&cMob limit reached!"
-  hopper.short: "&cHopper limit reached!"
-  chest.short: "&cChest limit reached!"
-  furnace.short: "&cFurnace limit reached!"
-  blast_furnace.short: "&cBlast furnace limit reached!"
-  smoker.short: "&cSmoker limit reached!"
-  barrel.short: "&cBarrel limit reached!"
-  dropper.short: "&cDropper limit reached!"
-  dispenser.short: "&cDispenser limit reached!"
-  shulker_box.short: "&cShulker box limit reached!"
-  tnt.short: "&cTNT limit reached!"
-  piston.short: "&cPiston limit reached!"
-  observer.short: "&cObserver limit reached!"
-  redstone.short: "&cRedstone disabled (lag prevention)"
-  near-limit.short: "&e{type} near limit: &f{used}&7/&f{max}"
+  mobs:
+    full: "&cMob limit reached in this chunk!"
+    short: "&cMob limit reached!"
+  hopper:
+    full: "&cHopper limit reached in this chunk!"
+    short: "&cHopper limit reached!"
+  chest:
+    full: "&cChest limit reached in this chunk!"
+    short: "&cChest limit reached!"
+  furnace:
+    full: "&cFurnace limit reached in this chunk!"
+    short: "&cFurnace limit reached!"
+  blast_furnace:
+    full: "&cBlast furnace limit reached in this chunk!"
+    short: "&cBlast furnace limit reached!"
+  smoker:
+    full: "&cSmoker limit reached in this chunk!"
+    short: "&cSmoker limit reached!"
+  barrel:
+    full: "&cBarrel limit reached in this chunk!"
+    short: "&cBarrel limit reached!"
+  dropper:
+    full: "&cDropper limit reached in this chunk!"
+    short: "&cDropper limit reached!"
+  dispenser:
+    full: "&cDispenser limit reached in this chunk!"
+    short: "&cDispenser limit reached!"
+  shulker_box:
+    full: "&cShulker box limit reached in this chunk!"
+    short: "&cShulker box limit reached!"
+  tnt:
+    full: "&cTNT limit reached in this chunk!"
+    short: "&cTNT limit reached!"
+  piston:
+    full: "&cPiston limit reached in this chunk!"
+    short: "&cPiston limit reached!"
+  observer:
+    full: "&cObserver limit reached in this chunk!"
+    short: "&cObserver limit reached!"
+  redstone:
+    full: "&cRedstone component forcibly disabled (lag prevention)."
+    short: "&cRedstone disabled (lag prevention)"
+  near-limit:
+    full: "&e[!] Warning: Chunk is nearing its limit for &f{type}&e (&f{used}&7/&f{max}&e)."
+    short: "&e{type} near limit: &f{used}&7/&f{max}"
 
 # == AutoChunkScanTask Messages ==
 alerts:
