@@ -82,7 +82,7 @@ public class LagShield {
 
         if (ConfigManager.isAlertsModuleEnabled()) {
             // Broadcast alert
-            String msg = MessageManager.get("lagshield.activated");
+            String msg = MessageManager.get("alerts.messages.lagshield.activated");
             if (msg != null && !msg.isEmpty()) {
                 Bukkit.broadcastMessage(msg);
             }
@@ -98,7 +98,7 @@ public class LagShield {
         LagXpert.getInstance().getLogger().info("[LagShield] 🟢 Performance recovered. Deactivating shield.");
 
         if (ConfigManager.isAlertsModuleEnabled()) {
-            String msg = MessageManager.get("lagshield.deactivated");
+            String msg = MessageManager.get("alerts.messages.lagshield.deactivated");
             if (msg != null && !msg.isEmpty()) {
                 Bukkit.broadcastMessage(msg);
             }

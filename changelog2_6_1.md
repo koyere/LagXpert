@@ -27,6 +27,11 @@ Server log was spamming this error when analyzing chunks with no tile entities (
 
 **Action required:** None. Just update the JAR.
 
+### Fixed: `Missing message: lagshield.activated` in console
+LagShield was looking for messages at `lagshield.activated` / `lagshield.deactivated` instead of the correct path `alerts.messages.lagshield.activated` / `alerts.messages.lagshield.deactivated` in `messages.yml`.
+
+**Action required:** None. Just update the JAR.
+
 ## 📦 Upgrade
 1. Replace `LagXpert-2.6.jar` with `LagXpert-2.6.1.jar`.
 2. Delete `plugins/LagXpert/messages.yml` (will regenerate on startup).
