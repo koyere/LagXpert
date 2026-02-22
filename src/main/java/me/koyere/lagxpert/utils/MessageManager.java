@@ -1,11 +1,13 @@
 package me.koyere.lagxpert.utils;
 
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
+import java.util.Map;
+
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import java.util.Map;
+
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 
 /**
  * Utility class for retrieving and formatting plugin messages.
@@ -106,6 +108,21 @@ public class MessageManager {
             return "";
         }
         return ChatColor.translateAlternateColorCodes('&', input);
+    }
+
+    /**
+     * Gets a translated name for a block or entity type from the translations section.
+     * Falls back to the provided default if the key is not found.
+     *
+     * @param key          The translation key (e.g., "hoppers", "chests", "mobs").
+     * @param defaultName  The fallback name if the key is missing.
+     * @return The translated name.
+     */
+    public static String getTranslation(String key, String defaultName) {
+        if (messagesConfig == null) {
+            return defaultName;
+        }
+        return messagesConfig.getString("translations." + key, defaultName);
     }
 
     /**

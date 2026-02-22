@@ -61,10 +61,8 @@ inspect:
     barrels: "&7Barrels: &e{barrels}"
     dispensers_droppers: "&7Dispensers/Droppers: &e{dispensers_droppers}"
 
-# == /chunkstatus Command ==
-chunkstatus:
-  info: "&aChunk Information: Mobs: {entities}, Hoppers: {hoppers}..."
-  limit-warning: "&cThis chunk is overloaded! Consider reducing entities or blocks."
+# == /chunkstatus Command (legacy keys, kept for compatibility) ==
+# The /chunkstatus display is now fully customizable below in the 'chunkstatus:' section near the end of this file.
 
 # == /clearitems Command ==
 clearitems:
@@ -163,6 +161,46 @@ alerts:
     lagshield:
       activated: "&c[LagShield] &7Performance Critical! &cTurning on emergency protections."
       deactivated: "&a[LagShield] &7Performance Stabilized. &aRestoring normal operations."
+
+# == Custom Translations for Block & Entity Names ==
+# These names appear in /chunkstatus, /lagxpert inspect, scan alerts, and near-limit warnings.
+# Translate them to match your server's language.
+translations:
+  mobs: "Mobs"
+  hoppers: "Hoppers"
+  chests: "Chests"
+  trapped_chests: "Trapped Chests"
+  furnaces: "Furnaces"
+  blast_furnaces: "Blast Furnaces"
+  smokers: "Smokers"
+  shulker_boxes: "Shulker Boxes"
+  droppers: "Droppers"
+  dispensers: "Dispensers"
+  barrels: "Barrels"
+  observers: "Observers"
+  pistons: "Pistons"
+  tnt: "TNT"
+
+# == /chunkstatus Command Display ==
+# Fully customizable lines for /chunkstatus output.
+# Only lines with count > 0 are shown. Use {count} for the block/entity count.
+chunkstatus:
+  header: "&8&m--------------------------------------------------"
+  title: "&b&lChunk Status &8| &7Chunk &e[{chunk_x}, {chunk_z}]&7 ({world})"
+  line-mobs: "&f• &a{name}: &e{count}"
+  line-hoppers: "&f• &a{name}: &e{count}"
+  line-chests: "&f• &a{name}: &e{count}"
+  line-furnaces: "&f• &a{name}: &e{count}"
+  line-blast_furnaces: "&f• &a{name}: &e{count}"
+  line-smokers: "&f• &a{name}: &e{count}"
+  line-shulker_boxes: "&f• &a{name}: &e{count}"
+  line-droppers: "&f• &a{name}: &e{count}"
+  line-dispensers: "&f• &a{name}: &e{count}"
+  line-barrels: "&f• &a{name}: &e{count}"
+  line-observers: "&f• &a{name}: &e{count}"
+  line-pistons: "&f• &a{name}: &e{count}"
+  line-tnt: "&f• &a{name}: &e{count}"
+  footer: "&8&m--------------------------------------------------"
 
 # == /lagxpert chunkload Redirect Message ==
 chunkload:

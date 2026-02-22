@@ -169,7 +169,9 @@ public class StorageListener implements Listener {
                         String alertKey = AlertCooldownManager.generateAlertKey(config.getOverloadCause() + "_near_limit", chunk);
                         if (AlertCooldownManager.canSendAlert(player, alertKey)) {
                             Map<String, Object> placeholders = new HashMap<>();
-                            placeholders.put("type", type.toString().toLowerCase().replace("_", " "));
+                            placeholders.put("type", MessageManager.getTranslation(
+                                    config.getOverloadCause(),
+                                    type.toString().toLowerCase().replace("_", " ")));
                             placeholders.put("used", String.valueOf(currentCount + 1));
                             placeholders.put("max", String.valueOf(limit));
                             MessageManager.sendFormattedRestrictionMessage(player, config.getNearLimitMessageKey(), placeholders);

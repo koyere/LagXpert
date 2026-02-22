@@ -55,48 +55,55 @@ public class ChunkStatusCommand implements CommandExecutor {
         int mobCount = countLivingEntitiesInChunk(chunk);
         Map<Material, Integer> blockCounts = countAllRelevantBlocksOptimized(chunk);
 
-        // --- Build Display Message ---
+        // --- Build Display Message using messages.yml ---
         StringBuilder msg = new StringBuilder();
-        msg.append(MessageManager.color("\n&8&m--------------------------------------------------\n"));
-        msg.append(MessageManager.color("&b&lChunk Status &8| &7Chunk &e[" + chunk.getX() + ", " + chunk.getZ() + "]&7 (" + chunk.getWorld().getName() + ")\n"));
-        msg.append(MessageManager.color("&f• &aMobs: &e" + mobCount + "\n"));
 
-        // Display counts for predefined important blocks, maintaining order
-        appendBlockCount(msg, "Hoppers", blockCounts.getOrDefault(Material.HOPPER, 0));
-        appendBlockCount(msg, "Chests",
+        Map<String, Object> titlePlaceholders = new java.util.HashMap<>();
+        titlePlaceholders.put("chunk_x", String.valueOf(chunk.getX()));
+        titlePlaceholders.put("chunk_z", String.valueOf(chunk.getZ()));
+        titlePlaceholders.put("world", chunk.getWorld().getName());
+
+        msg.append(MessageManager.get("chunkstatus.header")).append("\n");
+        msg.append(MessageManager.getFormatted("chunkstatus.title", titlePlaceholders)).append("\n");
+
+        // Display counts using translatable names from messages.yml
+        appendTranslatedBlockCount(msg, "mobs", mobCount);
+        appendTranslatedBlockCount(msg, "hoppers", blockCounts.getOrDefault(Material.HOPPER, 0));
+        appendTranslatedBlockCount(msg, "chests",
                 blockCounts.getOrDefault(Material.CHEST, 0) + blockCounts.getOrDefault(Material.TRAPPED_CHEST, 0));
-        appendBlockCount(msg, "Furnaces", blockCounts.getOrDefault(Material.FURNACE, 0));
-        appendBlockCount(msg, "Blast Furnaces", blockCounts.getOrDefault(Material.BLAST_FURNACE, 0));
-        appendBlockCount(msg, "Smokers", blockCounts.getOrDefault(Material.SMOKER, 0));
-        appendBlockCount(msg, "Shulker Boxes", blockCounts.getOrDefault(Material.SHULKER_BOX, 0)); // Special key for all shulkers
-        appendBlockCount(msg, "Droppers", blockCounts.getOrDefault(Material.DROPPER, 0));
-        appendBlockCount(msg, "Dispensers", blockCounts.getOrDefault(Material.DISPENSER, 0));
-        appendBlockCount(msg, "Barrels", blockCounts.getOrDefault(Material.BARREL, 0));
-        appendBlockCount(msg, "Observers", blockCounts.getOrDefault(Material.OBSERVER, 0));
-        appendBlockCount(msg, "Pistons",
+        appendTranslatedBlockCount(msg, "furnaces", blockCounts.getOrDefault(Material.FURNACE, 0));
+        appendTranslatedBlockCount(msg, "blast_furnaces", blockCounts.getOrDefault(Material.BLAST_FURNACE, 0));
+        appendTranslatedBlockCount(msg, "smokers", blockCounts.getOrDefault(Material.SMOKER, 0));
+        appendTranslatedBlockCount(msg, "shulker_boxes", blockCounts.getOrDefault(Material.SHULKER_BOX, 0));
+        appendTranslatedBlockCount(msg, "droppers", blockCounts.getOrDefault(Material.DROPPER, 0));
+        appendTranslatedBlockCount(msg, "dispensers", blockCounts.getOrDefault(Material.DISPENSER, 0));
+        appendTranslatedBlockCount(msg, "barrels", blockCounts.getOrDefault(Material.BARREL, 0));
+        appendTranslatedBlockCount(msg, "observers", blockCounts.getOrDefault(Material.OBSERVER, 0));
+        appendTranslatedBlockCount(msg, "pistons",
                 blockCounts.getOrDefault(Material.PISTON, 0) + blockCounts.getOrDefault(Material.STICKY_PISTON, 0));
-        appendBlockCount(msg, "TNT", blockCounts.getOrDefault(Material.TNT, 0));
+        appendTranslatedBlockCount(msg, "tnt", blockCounts.getOrDefault(Material.TNT, 0));
 
-
-        msg.append(MessageManager.color("&8&m--------------------------------------------------"));
+        msg.append(MessageManager.get("chunkstatus.footer"));
 
         player.sendMessage(msg.toString());
         return true;
     }
 
     /**
-     * Appends a line to the message string builder for a given block type and count,
+     * Appends a translated line from messages.yml for a given block type and count,
      * if the count is greater than zero.
      * @param msg StringBuilder to append to.
-     * @param friendlyName User-friendly name of the block type.
+     * @param translationKey The key used in both translations and chunkstatus line sections.
      * @param count The number of blocks of this type.
      */
-    private void appendBlockCount(StringBuilder msg, String friendlyName, int count) {
-        // Only append if count > 0 or if you always want to show the category
+    private void appendTranslatedBlockCount(StringBuilder msg, String translationKey, int count) {
         if (count > 0) {
-            msg.append(MessageManager.color("&f• &a" + friendlyName + ": &e" + count + "\n"));
+            String translatedName = MessageManager.getTranslation(translationKey, translationKey);
+            Map<String, Object> placeholders = new java.util.HashMap<>();
+            placeholders.put("name", translatedName);
+            placeholders.put("count", String.valueOf(count));
+            msg.append(MessageManager.getFormatted("chunkstatus.line-" + translationKey, placeholders)).append("\n");
         }
-        // Else: if you want to show "BlockName: 0", remove the if (count > 0)
     }
 
 
