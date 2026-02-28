@@ -1,16 +1,31 @@
 package me.koyere.lagxpert.tasks;
 
-import me.koyere.lagxpert.LagXpert;
-import me.koyere.lagxpert.utils.ConfigManager;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.*;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Boat;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.ItemFrame;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Minecart;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Tameable;
+import org.bukkit.entity.Vehicle;
+import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.utils.ConfigManager;
+import me.koyere.lagxpert.utils.MessageManager;
 
 /**
  * Comprehensive entity cleanup task that removes various types of problematic entities
@@ -55,8 +70,9 @@ public class EntityCleanupTask extends BukkitRunnable {
         // Broadcast completion message if enabled and threshold is met
         if (ConfigManager.shouldBroadcastEntityCleanupCompletion() &&
                 totalCleaned >= ConfigManager.getEntityCleanupBroadcastThreshold()) {
-            String message = ConfigManager.getEntityCleanupCompleteMessage()
-                    .replace("{count}", String.valueOf(totalCleaned));
+            String message = MessageManager.color(
+                    ConfigManager.getEntityCleanupCompleteMessage()
+                    .replace("{count}", String.valueOf(totalCleaned)));
             Bukkit.broadcastMessage(message);
         }
 

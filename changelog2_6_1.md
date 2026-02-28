@@ -33,6 +33,9 @@ A new `translations:` section lets you rename items like "Hoppers", "Chests", "M
 ### Fixed: Chests and Trapped Chests duplicated in scan statistics
 Chests and Trapped Chests were showing as two separate entries in chunk overload alerts, even though they share the same limit. They are now combined into a single "Chests" entry. Same fix applied to Pistons/Sticky Pistons.
 
+### Fixed: Entity cleanup message showing raw color codes
+The entity cleanup broadcast message (`&a`, `&e`, etc.) was not being translated to actual colors, showing raw codes like `&e18&a` in chat.
+
 ## 📦 Upgrade
 1. Replace `LagXpert-2.6.jar` with `LagXpert-2.6.1.jar`.
 2. Delete `plugins/LagXpert/messages.yml` (will regenerate on startup with new translation options).
