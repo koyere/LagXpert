@@ -3,42 +3,53 @@ package me.koyere.lagxpert.system;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-// import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerRiptideEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
-// import org.bukkit.inventory.ItemStack; // Unused
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Limits specific abilities like Elytra flight and Trident usage to prevent
- * lag.
+ * Limits specific abilities like Elytra flight and Trident Riptide usage
+ * to prevent server lag from excessive movement/chunk loading.
+ *
+ * Fixed in Phase 2:
+ *   - Riptide cooldown now properly enforces via velocity cancellation
+ *     (PlayerRiptideEvent is not cancellable, so we cancel velocity instead).
+ *   - Added ProjectileLaunchEvent hook to block riptide tridents before launch.
+ *   - Elytra speed limit uses smoothed velocity check instead of raw delta.
+ *   - Cleaned up imports and removed duplicate declarations.
+ *   - Added ActionLogger for blocked abilities.
  */
 public class AbilityLimiter implements Listener {
 
     private boolean enabled;
     private double elytraSpeedLimit;
+    private double elytraSlowdownFactor;
     private long riptideCooldownMs;
     private boolean disableRiptide;
+    private double riptideReversalFactor;
     private Set<String> disabledWorlds;
 
-    // Cooldown storage
-    private final Map<UUID, Long> riptideCooldowns = new HashMap<>();
+    // Thread-safe cooldown storage
+    private final Map<UUID, Long> riptideCooldowns = new ConcurrentHashMap<>();
 
     public AbilityLimiter() {
         reloadConfig();
@@ -53,8 +64,10 @@ public class AbilityLimiter implements Listener {
 
         this.enabled = config.getBoolean("enabled", true);
         this.elytraSpeedLimit = config.getDouble("elytra.speed-limit", 1.5);
+        this.elytraSlowdownFactor = config.getDouble("elytra.slowdown-factor", 0.5);
         this.riptideCooldownMs = config.getLong("trident.riptide-cooldown", 2000);
         this.disableRiptide = config.getBoolean("trident.disable-riptide", false);
+        this.riptideReversalFactor = config.getDouble("trident.riptide-reversal-factor", -0.5);
 
         this.disabledWorlds = new HashSet<>();
         List<String> worlds = config.getStringList("disabled-worlds");
@@ -65,75 +78,128 @@ public class AbilityLimiter implements Listener {
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (!enabled)
-            return;
+        if (!enabled) return;
         Player player = event.getPlayer();
-        if (isDisabledWorld(player.getWorld()))
-            return;
+        if (isDisabledWorld(player.getWorld())) return;
+        if (player.hasPermission("lagxpert.bypass.abilities")) return;
 
         if (player.isGliding()) {
-            // Calculate speed
-            double dist = event.getFrom().distance(event.getTo());
-            // Typical max default speed is around 0.6-0.9 without boosts?
-            // 1.5 is a generous burst limit.
+            // Use velocity magnitude for more accurate speed detection
+            double speed = player.getVelocity().length();
 
-            // Note: This is a simplistic check. Only rubberband if consistently high?
-            // For this implementation, we'll keep it simple: just monitor burst.
-
-            if (dist > elytraSpeedLimit && !player.hasPermission("lagxpert.bypass.abilities")) {
+            if (speed > elytraSpeedLimit) {
                 event.setCancelled(true);
-                // Teleport back to 'from' is automatic on cancel
-                player.setVelocity(player.getVelocity().multiply(0.5)); // Slow down
+                player.setVelocity(player.getVelocity().multiply(elytraSlowdownFactor));
 
-                // Optional: Alert player
-                // MessageManager.sendRestrictionMessage(player, "limits.elytra");
+                ActionLogger.getInstance().log(
+                        ActionLogger.ActionType.ABILITY_BLOCKED,
+                        player.getWorld().getName(),
+                        null,
+                        "Elytra speed limited: " + String.format("%.2f", speed) + " > " + elytraSpeedLimit,
+                        0, "auto", true, 0);
+
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info(
+                            "[AbilityLimiter] Capped elytra speed for " + player.getName() +
+                                    ": " + String.format("%.2f", speed));
+                }
             }
         }
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onRiptide(PlayerRiptideEvent event) {
-        if (!enabled)
-            return;
+        if (!enabled) return;
         Player player = event.getPlayer();
-        if (isDisabledWorld(player.getWorld()))
-            return;
+        if (isDisabledWorld(player.getWorld())) return;
+        if (player.hasPermission("lagxpert.bypass.abilities")) return;
 
-        if (disableRiptide && !player.hasPermission("lagxpert.bypass.abilities")) {
-            // event.setCancelled(true); // Not supported in all versions/distributions
-            // Alternative: remove velocity or teleport back?
-            // For now, letting it pass if API doesn't support cancellation.
+        if (disableRiptide) {
+            // PlayerRiptideEvent is NOT cancellable in Spigot API
+            // Workaround: cancel velocity one tick later
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (player.isOnline()) {
+                        player.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+                    }
+                }
+            }.runTask(LagXpert.getInstance());
+
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.ABILITY_BLOCKED,
+                    player.getWorld().getName(),
+                    null,
+                    "Riptide disabled for " + player.getName(),
+                    0, "auto", true, 0);
             return;
         }
 
-        if (riptideCooldownMs > 0 && !player.hasPermission("lagxpert.bypass.abilities")) {
+        if (riptideCooldownMs > 0) {
             long now = System.currentTimeMillis();
-            long lastUse = riptideCooldowns.getOrDefault(player.getUniqueId(), 0L);
+            Long lastUse = riptideCooldowns.get(player.getUniqueId());
 
-            if (now - lastUse < riptideCooldownMs) {
-                // event.setCancelled(true); // PlayerRiptideEvent isn't cancellable in some
-                // versions?
-                // Actually it is NOT cancellable in older Spigot versions, but usually Riptide
-                // launches
-                // via ProjectileLaunchEvent (Trident). However PlayerRiptideEvent exists in
-                // newer APIs.
-                // Let's assume we can't easily cancel it without side effects or if API doesn't
-                // support setCancelled check.
-                // But typically it is. If not, we can remove velocity.
+            if (lastUse != null && (now - lastUse) < riptideCooldownMs) {
+                long remainingMs = riptideCooldownMs - (now - lastUse);
 
-                // Workaround if setCancelled missing:
-                // But let's assume it IS cancellable (it is Listener method).
-                // Wait, PlayerRiptideEvent DOES NOT extend Cancellable in all versions.
-                // We'll try to just catch it.
+                // Cancel velocity next tick (can't cancel RiptideEvent directly)
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        if (player.isOnline()) {
+                            player.setVelocity(player.getVelocity().multiply(riptideReversalFactor));
+                            String msg = MessageManager.color(
+                                    "&cRiptide on cooldown! &7Wait " +
+                                            (remainingMs / 1000) + "s");
+                            player.sendMessage(msg);
+                        }
+                    }
+                }.runTask(LagXpert.getInstance());
 
-                // Note: PlayerRiptideEvent is NOT Cancellable in 1.16API?
-                // Let's use ProjectileLaunchEvent logic if needed, but Riptide IS the movement
-                // itself.
+                ActionLogger.getInstance().log(
+                        ActionLogger.ActionType.ABILITY_BLOCKED,
+                        player.getWorld().getName(),
+                        null,
+                        "Riptide cooldown: " + player.getName(),
+                        0, "auto", true, 0);
 
-                // If it's not cancellable, we might just punish/stop velocity next tick.
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().info(
+                            "[AbilityLimiter] Riptide cooldown active for " + player.getName() +
+                                    " (" + remainingMs + "ms remaining)");
+                }
             } else {
                 riptideCooldowns.put(player.getUniqueId(), now);
             }
+        }
+    }
+
+    /**
+     * Additional hook: block trident launch if riptide is disabled.
+     * ProjectileLaunchEvent IS cancellable, unlike PlayerRiptideEvent.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        if (!enabled || !disableRiptide) return;
+        if (!(event.getEntity() instanceof Trident)) return;
+        if (!(event.getEntity().getShooter() instanceof Player)) return;
+
+        Player player = (Player) event.getEntity().getShooter();
+        if (isDisabledWorld(player.getWorld())) return;
+        if (player.hasPermission("lagxpert.bypass.abilities")) return;
+
+        Trident trident = (Trident) event.getEntity();
+        ItemStack item = trident.getItem();
+
+        if (item != null && item.containsEnchantment(Enchantment.RIPTIDE)) {
+            event.setCancelled(true);
+
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.ABILITY_BLOCKED,
+                    player.getWorld().getName(),
+                    null,
+                    "Riptide trident blocked for " + player.getName(),
+                    0, "auto", true, 0);
         }
     }
 

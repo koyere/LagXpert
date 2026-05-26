@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Configures the behavior of the redstone control system.
 # This system aims to prevent lag caused by redstone mechanisms that remain
-# active for excessively long periods or update too rapidly (future consideration).
+# active for excessively long periods or update too rapidly.
 #
 # IMPORTANT: The entire redstone control module must first be enabled via
 # 'modules.redstone: true' in the main 'config.yml'.
@@ -10,14 +10,71 @@
 # -----------------------------------------------------------------------------
 
 control:
-  # Maximum duration (in server ticks) that a redstone wire (Material.REDSTONE_WIRE)
-  # may remain continuously powered before LagXpert intervenes (e.g., by cutting the wire).
+  # Maximum duration (in server ticks) that a redstone wire may remain
+  # continuously powered before LagXpert intervenes.
   # 1 second = 20 ticks. Default: 100 ticks = 5 seconds.
-  # Set to 0 or a negative value to disable this specific duration check,
-  # though RedstoneListener's scheduleRedstoneCheck already handles delayTicks <= 0.
+  # Set to 0 or a negative value to disable this specific duration check.
   redstone-active-ticks: 100
 
-  # Future considerations for this file (not yet implemented in current code):
-  # - Whitelisted redstone components (e.g., allow specific clocks).
-  # - Different tick limits for different redstone components (e.g., pistons, comparators).
-  # - Control over rapid pulsing/clock detection.
+# Advanced Circuit Tracking (v2.7+)
+# Settings for the RedstoneCircuitTracker's detection and shutdown behavior.
+circuit-tracker:
+  # Circuit classification thresholds
+  detection:
+    # Search radius for detecting nearby repeaters (clock detection)
+    nearby-repeater-radius: 3
+
+    # Search radius for complex pattern detection
+    complex-pattern-radius-xz: 2
+    complex-pattern-radius-y: 1
+
+    # Minimum number of redstone components in range to classify as "complex"
+    complex-pattern-threshold: 5
+
+  # Pulse frequency analysis
+  pulses:
+    # Time window for measuring pulse frequency (milliseconds)
+    measurement-window-ms: 10000
+    # Maximum pulses allowed in the measurement window before triggering shutdown
+    max-pulses-per-window: 200
+
+  # Maximum activity duration per circuit type (milliseconds)
+  # After this duration, the circuit is scheduled for shutdown
+  max-duration:
+    clock-circuit: 5000        # Clock circuit (inherits redstone-active-ticks)
+    continuous-circuit: 300000 # 5 minutes
+    complex-circuit: 600000    # 10 minutes
+    pulse-circuit: 60000       # 1 minute
+    unknown-circuit: 180000    # 3 minutes
+
+  # Grace periods before shutdown per circuit type (milliseconds)
+  # Players are warned during this period before redstone is cut
+  grace-periods:
+    clock-circuit: 10000       # 10 seconds
+    continuous-circuit: 30000  # 30 seconds
+    complex-circuit: 60000     # 1 minute
+    unknown-circuit: 20000     # 20 seconds
+
+  # Shutdown behavior
+  shutdown:
+    # Enable flood-fill circuit analysis (finds ALL connected components)
+    # When disabled, only the single origin block is broken
+    flood-fill-enabled: true
+
+    # Maximum blocks to analyze in flood-fill (safety cap against infinite loops)
+    max-circuit-size: 200
+
+    # Maximum blocks to break per circuit shutdown (safety cap)
+    max-breaks-per-shutdown: 50
+
+    # Threshold: if first pass (wires/torches) breaks fewer than this many blocks,
+    # escalate to second pass (repeaters/comparators)
+    escalate-threshold: 3
+
+  # Inactive circuit cleanup
+  cleanup:
+    # Time (ms) without activity before a circuit is considered dead and removed from tracking
+    inactivity-timeout-ms: 60000
+
+    # Interval (ticks) between cleanup cycles
+    interval-ticks: 1200

@@ -1,7 +1,7 @@
 package me.koyere.lagxpert.monitoring;
 
 import me.koyere.lagxpert.LagXpert;
-import me.koyere.lagxpert.system.LagShield; // Import LagShield
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.utils.ConfigManager;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -196,15 +196,17 @@ public class TPSMonitor extends BukkitRunnable {
         // Detect and handle lag spikes
         detectLagSpikes(tickTimeMs, timestampSeconds);
 
-        // Calculate Memory Usage for LagShield
+        // Calculate Memory Usage for EmergencyController
         long maxMemory = Runtime.getRuntime().maxMemory();
         long totalMemory = Runtime.getRuntime().totalMemory();
         long freeMemory = Runtime.getRuntime().freeMemory();
         long usedMemory = totalMemory - freeMemory;
         double memoryUsagePercent = (maxMemory > 0) ? ((double) usedMemory / maxMemory) * 100.0 : 0.0;
 
-        // Update LagShield
-        LagShield.getInstance().onTick(currentTPS, memoryUsagePercent);
+        // Feed real-time metrics to EmergencyController for state evaluation
+        int onlinePlayers = Bukkit.getOnlinePlayers().size();
+        EmergencyController.getInstance().evaluate(currentTPS, memoryUsagePercent,
+                onlinePlayers, onlinePlayers);
 
         // Log debug information if enabled
         if (ConfigManager.shouldLogTPSCalculations()) {

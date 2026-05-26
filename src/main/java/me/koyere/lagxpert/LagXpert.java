@@ -9,7 +9,11 @@ import me.koyere.lagxpert.metrics.MetricsHandler;
 import me.koyere.lagxpert.monitoring.PerformanceTracker;
 import me.koyere.lagxpert.monitoring.TPSMonitor;
 import me.koyere.lagxpert.system.AbyssManager;
+import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.ChunkManager;
+import me.koyere.lagxpert.system.EmergencyController;
+import me.koyere.lagxpert.system.PerformanceHistory;
 import me.koyere.lagxpert.system.RedstoneCircuitTracker;
 import me.koyere.lagxpert.tasks.AsyncChunkAnalyzer;
 import me.koyere.lagxpert.tasks.AutoChunkScanTask;
@@ -26,6 +30,7 @@ import me.koyere.lagxpert.utils.SchedulerWrapper;
 import me.koyere.lagxpert.utils.BedrockPlayerUtils;
 import me.koyere.lagxpert.gui.BedrockCompatibleGUI;
 import me.koyere.lagxpert.system.SmartMobManager;
+import me.koyere.lagxpert.system.SmartScheduler;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -81,12 +86,21 @@ public class LagXpert extends JavaPlugin {
         // Phase 1: Core systems
         initializeAdvancedSystems(); // Phase 1 systems
 
+        // Phase 0 Safety Net: Emergency Controller & Action Logger
+        initializeEmergencyController();
+        initializeActionLogger();
+
         // Phase 2: Advanced systems
         initializeMonitoringSystems(); // Phase 2 systems
         initializeChunkManagementSystems(); // Phase 2 chunk management
         initializeSmartMobManagement(); // NEW: Smart mob management
         initializeGUISystem(); // Phase 2 GUI system
         initializeMetrics(); // Initialize bStats and custom charts
+
+        // Phase 3: Proactive Intelligence
+        initializeAdaptiveThresholds();
+        initializePerformanceHistory();
+        initializeSmartScheduler();
 
         getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully on " +
                 PlatformDetector.getPlatformSummary() + " with multi-platform compatibility.");
@@ -107,6 +121,14 @@ public class LagXpert extends JavaPlugin {
         // Shutdown Phase 1 systems gracefully
         // Shutdown Phase 1 systems gracefully
         shutdownAdvancedSystems();
+
+        // Shutdown Phase 0 Safety Net
+        shutdownEmergencyController();
+        shutdownActionLogger();
+
+        // Shutdown Phase 3 Proactive Intelligence
+        shutdownPerformanceHistory();
+        shutdownSmartScheduler();
 
         // Shutdown ConsoleFilter
         if (consoleFilter != null) {
@@ -145,7 +167,9 @@ public class LagXpert extends JavaPlugin {
                 "itemcleaner.yml",
                 "entitycleanup.yml", // Phase 1 entity cleanup config
                 "monitoring.yml", // Phase 2 monitoring config
-                "chunks.yml" // Phase 2 chunk management config
+                "chunks.yml", // Phase 2 chunk management config
+                "emergency-controller.yml", // Emergency Controller state machine config
+                "profiles.yml" // Optimization profiles
         };
 
         // Only save files that don't exist to prevent warnings
@@ -235,16 +259,77 @@ public class LagXpert extends JavaPlugin {
                         }
                     }
                 } else {
-                    // Resource doesn't exist in JAR, create a basic template
                     createBasicWorldConfigTemplate(worldConfigFile, fileName);
                 }
-
             } catch (Exception e) {
-                getLogger()
-                        .warning("[LagXpert] Failed to create world configuration " + fileName + ": " + e.getMessage());
-                // Fallback: create a basic template
+                getLogger().warning("[LagXpert] Failed to create world configuration " + fileName + ": " + e.getMessage());
                 createBasicWorldConfigTemplate(worldConfigFile, fileName);
             }
+        }
+    }
+
+    /**
+     * Initializes the Adaptive Threshold Engine (Phase 3).
+     */
+    private void initializeAdaptiveThresholds() {
+        try {
+            AdaptiveThresholdEngine.getInstance().loadConfig();
+            getLogger().info("[LagXpert] Adaptive Threshold Engine initialized.");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Adaptive Threshold Engine: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Initializes Performance History tracking (Phase 3).
+     * Loads previous data from disk and schedules periodic snapshots.
+     */
+    private void initializePerformanceHistory() {
+        try {
+            // Schedule snapshot recording every 5 minutes
+            long intervalTicks = 6000L; // 5 minutes
+            me.koyere.lagxpert.utils.SchedulerWrapper.runTaskTimer(
+                    () -> PerformanceHistory.getInstance().recordSnapshot(),
+                    intervalTicks, intervalTicks);
+            getLogger().info("[LagXpert] Performance History tracking initialized.");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Performance History: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Initializes the Smart Scheduler (Phase 3).
+     */
+    private void initializeSmartScheduler() {
+        try {
+            SmartScheduler.getInstance();
+            getLogger().info("[LagXpert] Smart Scheduler initialized.");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Smart Scheduler: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Saves performance history to disk on shutdown.
+     */
+    private void shutdownPerformanceHistory() {
+        try {
+            PerformanceHistory.getInstance().saveToDisk();
+            getLogger().info("[LagXpert] Performance History saved to disk.");
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error saving Performance History: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Shuts down the Smart Scheduler.
+     */
+    private void shutdownSmartScheduler() {
+        try {
+            SmartScheduler.getInstance().cancelAll();
+            getLogger().info("[LagXpert] Smart Scheduler shutdown completed.");
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error during Smart Scheduler shutdown: " + e.getMessage());
         }
     }
 
@@ -1168,6 +1253,57 @@ public class LagXpert extends JavaPlugin {
                         "[LagXpert] Error deleting world configuration for " + worldName + ": " + e.getMessage());
             }
             return false;
+        }
+    }
+
+    /**
+     * Initializes the Emergency Controller state machine (Phase 0 Safety Net).
+     * Loads configuration and sets up state change listeners.
+     */
+    private void initializeEmergencyController() {
+        try {
+            EmergencyController.getInstance().loadConfig();
+            getLogger().info("[LagXpert] Emergency Controller initialized.");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Emergency Controller: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Initializes the Action Logger audit trail (Phase 0 Safety Net).
+     */
+    private void initializeActionLogger() {
+        try {
+            ActionLogger.getInstance().initialize();
+            getLogger().info("[LagXpert] Action Logger initialized.");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Action Logger: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Gracefully shuts down the Emergency Controller.
+     */
+    private void shutdownEmergencyController() {
+        try {
+            EmergencyController.getInstance().shutdown();
+            getLogger().info("[LagXpert] Emergency Controller shutdown completed.");
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error during Emergency Controller shutdown: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Gracefully shuts down the Action Logger.
+     */
+    private void shutdownActionLogger() {
+        try {
+            ActionLogger.getInstance().shutdown();
+            getLogger().info("[LagXpert] Action Logger shutdown completed.");
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error during Action Logger shutdown: " + e.getMessage());
         }
     }
 }

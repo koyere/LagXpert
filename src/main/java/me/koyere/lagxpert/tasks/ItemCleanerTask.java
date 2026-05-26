@@ -3,6 +3,8 @@ package me.koyere.lagxpert.tasks;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.system.AbyssManager;
 import me.koyere.lagxpert.system.AbyssTracker; // For bStats
+import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.system.RecentlyBrokenBlocksTracker;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
@@ -89,6 +91,15 @@ public class ItemCleanerTask extends BukkitRunnable {
 
         if (totalItemsRemoved > 0) {
             AbyssTracker.itemAddedToAbyss(totalItemsRemoved);
+
+            // Log corrective action to audit trail
+            String triggeredBy = EmergencyController.getInstance().getCurrentState() !=
+                    EmergencyController.ServerState.NORMAL ? "emergency" : "auto";
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.ITEM_CLEARED_BULK,
+                    null, null,
+                    "Automatic cleanup cycle",
+                    totalItemsRemoved, triggeredBy, true, 0);
         }
 
         if (ConfigManager.isDebugEnabled() && actor == null && totalItemsRemoved > 0) {

@@ -91,6 +91,12 @@ public class ExplosionController implements Listener {
 
         if (radius > maxRadius) {
             event.setRadius((float) maxRadius);
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.EXPLOSION_LIMITED,
+                    entity.getWorld().getName(),
+                    null,
+                    entity.getType().name() + " radius capped: " + String.format("%.1f", radius) + " → " + String.format("%.1f", maxRadius),
+                    0, "auto", true, 0);
         }
     }
 

@@ -24,6 +24,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 
@@ -74,6 +76,17 @@ public class EntityCleanupTask extends BukkitRunnable {
                     ConfigManager.getEntityCleanupCompleteMessage()
                     .replace("{count}", String.valueOf(totalCleaned)));
             Bukkit.broadcastMessage(message);
+        }
+
+        // Log corrective action to audit trail
+        if (totalCleaned > 0) {
+            String triggeredBy = EmergencyController.getInstance().getCurrentState() !=
+                    EmergencyController.ServerState.NORMAL ? "emergency" : "auto";
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.ENTITY_CLEANED_BULK,
+                    null, null,
+                    "Duration: " + duration + "ms",
+                    totalCleaned, triggeredBy, true, duration);
         }
 
         if (ConfigManager.isDebugEnabled() || totalCleaned > 0) {
@@ -554,6 +567,17 @@ public class EntityCleanupTask extends BukkitRunnable {
         stats.put("empty_containers_removed", emptyContainersRemoved.get());
         stats.put("out_of_bounds_entities_removed", outOfBoundsEntitiesRemoved.get());
         return stats;
+    }
+
+    /**
+     * Runs cleanup immediately and returns the number of entities removed.
+     * Used by /lagxpert optimize and manual triggers.
+     */
+    public static int runImmediate() {
+        EntityCleanupTask task = new EntityCleanupTask();
+        int before = totalEntitiesRemoved.get();
+        task.run();
+        return totalEntitiesRemoved.get() - before;
     }
 
     /**

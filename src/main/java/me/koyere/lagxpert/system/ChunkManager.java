@@ -363,8 +363,13 @@ public class ChunkManager {
             }
         }
 
-        // Check activity threshold
-        long inactivityThresholdMs = ConfigManager.getChunkInactivityThresholdMinutes() * 60 * 1000L;
+        // Check activity threshold — use EmergencyController's aggressive threshold if active
+        long inactivityThresholdMs;
+        if (EmergencyController.getInstance().shouldAggressiveChunkUnload()) {
+            inactivityThresholdMs = EmergencyController.getInstance().getUnloadInactivityMinutes() * 60 * 1000L;
+        } else {
+            inactivityThresholdMs = ConfigManager.getChunkInactivityThresholdMinutes() * 60 * 1000L;
+        }
         if (!activity.isInactive(inactivityThresholdMs)) {
             return false; // Still active
         }

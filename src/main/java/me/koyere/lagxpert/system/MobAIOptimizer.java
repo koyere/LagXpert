@@ -105,6 +105,9 @@ public class MobAIOptimizer {
         if (!entity.isValid())
             return;
 
+        // Use EmergencyController's dynamic distance threshold when active
+        int effectiveDistanceThreshold = EmergencyController.getInstance().getAIDistanceThreshold();
+
         // If explicitly disabled by type/world, keep it disabled
         if (disabledAiTypes.contains(entity.getType().name().toUpperCase()) ||
                 disabledAiWorlds.contains(entity.getWorld().getName().toLowerCase())) {
@@ -122,7 +125,7 @@ public class MobAIOptimizer {
         }
 
         double distanceSq = entity.getLocation().distanceSquared(nearest.getLocation());
-        double thresholdSq = distanceThreshold * distanceThreshold;
+        double thresholdSq = effectiveDistanceThreshold * effectiveDistanceThreshold;
 
         if (distanceSq > thresholdSq) {
             if (entity.hasAI())

@@ -3,7 +3,9 @@ package me.koyere.lagxpert.tasks;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.cache.ChunkDataCache;
+import me.koyere.lagxpert.system.ActionLogger;
 import me.koyere.lagxpert.system.AlertCooldownManager;
+import me.koyere.lagxpert.system.SmartMobManager;
 import me.koyere.lagxpert.utils.ChunkUtils;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
@@ -152,6 +154,21 @@ public class AutoChunkScanTask extends BukkitRunnable {
                             overloadedElementsSummary.append(", ");
                         }
                         overloadedElementsSummary.append(count).append(" ").append(element.getDisplayName());
+
+                        // Proactive corrective action for mob overloads
+                        if (element.getOverloadCauseSuffix().equals("mobs")) {
+                            int removed = SmartMobManager.getInstance().processChunkImmediately(currentChunk);
+                            if (removed > 0) {
+                                String chunkKey = currentChunk.getWorld().getName() + "_" +
+                                        currentChunk.getX() + "_" + currentChunk.getZ();
+                                ActionLogger.getInstance().log(
+                                        ActionLogger.ActionType.MOB_REMOVED_BULK,
+                                        currentChunk.getWorld().getName(),
+                                        chunkKey,
+                                        "Scan-triggered removal: " + removed + " mobs",
+                                        removed, "auto-scan", true, 0);
+                            }
+                        }
                     } else if (count >= (int) (limit * 0.8) && isChunkCurrentlyPopulatedByPlayers && limit > 0) {
                         if (ConfigManager.isAlertsModuleEnabled() && ConfigManager.shouldAutoScanTriggerIndividualNearLimitWarnings()) {
                             sendNearLimitWarning(playersInThisChunk, element, count, limit, currentChunk);

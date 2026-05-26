@@ -3,6 +3,7 @@ package me.koyere.lagxpert.listeners;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.cache.ChunkDataCache;
+import me.koyere.lagxpert.system.ActionLogger;
 import me.koyere.lagxpert.system.AlertCooldownManager;
 import me.koyere.lagxpert.tasks.AsyncChunkAnalyzer;
 import me.koyere.lagxpert.utils.ChunkUtils;
@@ -141,6 +142,15 @@ public class StorageListener implements Listener {
             if (currentCount >= limit && limit > 0) {
                 event.setCancelled(true);
                 fireChunkOverloadEvent(chunk, config.getOverloadCause() + "_limit_exceeded_placement");
+
+                // Log blocked placement to audit trail
+                String chunkKey = chunk.getWorld().getName() + "_" + chunk.getX() + "_" + chunk.getZ();
+                ActionLogger.getInstance().log(
+                        ActionLogger.ActionType.PLACEMENT_BLOCKED,
+                        chunk.getWorld().getName(),
+                        chunkKey,
+                        type + " by " + player.getName() + " (count: " + currentCount + ", limit: " + limit + ")",
+                        1, "auto", true, 0);
 
                 if (ConfigManager.isAlertsModuleEnabled() && shouldShowLimitReachedAlert(config.getMaterial())) {
                     // Only send alerts to players with permission to receive them

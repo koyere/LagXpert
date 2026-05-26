@@ -2,8 +2,11 @@ package me.koyere.lagxpert.listeners;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
-import me.koyere.lagxpert.system.AlertCooldownManager; // Import AlertCooldownManager
+import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AlertCooldownManager;
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.system.MobAIOptimizer;
+import me.koyere.lagxpert.system.SmartMobManager;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -75,13 +78,25 @@ public class EntityListener implements Listener {
             }
         }
 
-        // Get the highest custom limit from any player in the chunk, or use default
+        // Get the effective mob limit — factors in EmergencyController state multiplier
         int mobLimit = getEffectiveMobLimit(playersInChunk, chunk.getWorld());
         int nearLimitThreshold = (int) (mobLimit * 0.80);
 
         if (livingEntitiesInChunk >= mobLimit) {
             event.setCancelled(true);
             fireChunkOverloadEvent(chunk, "mobs_limit_reached");
+
+            // Proactively clean the chunk so the next spawn attempt can succeed
+            SmartMobManager.getInstance().processChunkImmediately(chunk);
+
+            // Log corrective action to audit trail
+            String chunkKey = chunk.getWorld().getName() + "_" + chunk.getX() + "_" + chunk.getZ();
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.SPAWN_BLOCKED,
+                    chunk.getWorld().getName(),
+                    chunkKey,
+                    "Count: " + livingEntitiesInChunk + ", Limit: " + mobLimit,
+                    1, "auto", true, 0);
 
             if (ConfigManager.isDebugEnabled()) {
                 LagXpert.getInstance().getLogger().info(
@@ -156,11 +171,12 @@ public class EntityListener implements Listener {
 
     /**
      * Gets the effective mob limit for a chunk, considering custom permission-based
-     * limits.
+     * limits AND the EmergencyController's dynamic state multiplier.
      * If multiple players are in the chunk, uses the highest custom limit found.
-     * Priority: Highest custom permission limit > Default config limit
+     * Priority: Highest custom permission limit > EmergencyController-adjusted config limit
      *
      * @param playersInChunk List of players in the chunk
+     * @param world          The world the chunk is in
      * @return The effective mob limit for this chunk
      */
     private int getEffectiveMobLimit(List<Player> playersInChunk, World world) {
@@ -174,8 +190,11 @@ public class EntityListener implements Listener {
             }
         }
 
-        // Return custom limit if found, otherwise default
-        return highestCustomLimit > 0 ? highestCustomLimit : ConfigManager.getMaxMobsPerChunk(world);
+        // Return custom limit if found, otherwise use EmergencyController-adjusted limit
+        if (highestCustomLimit > 0) {
+            return highestCustomLimit;
+        }
+        return EmergencyController.getInstance().getEffectiveMobLimit(world);
     }
 
     /**

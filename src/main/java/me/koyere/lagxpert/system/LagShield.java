@@ -3,32 +3,25 @@ package me.koyere.lagxpert.system;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
-// import me.koyere.lagxpert.utils.SchedulerWrapper; // Unused
 import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
-
-import java.io.File;
 
 /**
- * LagShield: Reactive protection system.
- * Reacts to low TPS or high Memory usage by enabling emergency restrictions.
+ * LagShield — deprecated passthrough to EmergencyController.
+ *
+ * This class is kept for backward compatibility with existing code that
+ * references LagShield. All actual logic now lives in EmergencyController.
+ *
+ * @deprecated Use {@link EmergencyController#getInstance()} directly.
  */
+@Deprecated
 public class LagShield {
 
     private static LagShield instance;
-    private boolean active = false;
     private boolean enabled;
-
-    // Thresholds
     private double criticalTps;
     private double recoveryTps;
     private double criticalRam;
     private double recoveryRam;
-
-    // Actions
-    private double mobCapMultiplier;
-    private boolean blockNaturalSpawns;
 
     private LagShield() {
         reloadConfig();
@@ -42,78 +35,55 @@ public class LagShield {
     }
 
     public void reloadConfig() {
-        File file = new File(LagXpert.getInstance().getDataFolder(), "lagshield.yml");
+        java.io.File file = new java.io.File(LagXpert.getInstance().getDataFolder(), "emergency-controller.yml");
         if (!file.exists()) {
-            // Should save default resource if not exists, skipping for now as we just
-            // created it
+            this.enabled = false;
+            return;
         }
-        FileConfiguration config = YamlConfiguration.loadConfiguration(file);
+        org.bukkit.configuration.file.FileConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
 
         this.enabled = config.getBoolean("enabled", true);
-        this.criticalTps = config.getDouble("thresholds.tps.critical", 16.0);
-        this.recoveryTps = config.getDouble("thresholds.tps.recovery", 18.5);
+        this.criticalTps = config.getDouble("thresholds.tps.critical", 15.0);
+        this.recoveryTps = config.getDouble("thresholds.tps.recovery", 19.0);
         this.criticalRam = config.getDouble("thresholds.ram.critical", 90.0);
-        this.recoveryRam = config.getDouble("thresholds.ram.recovery", 80.0);
-
-        this.mobCapMultiplier = config.getDouble("actions.reduce-limits.mob-cap-multiplier", 0.5);
-        this.blockNaturalSpawns = config.getBoolean("actions.block-spawns.natural", true);
+        this.recoveryRam = config.getDouble("thresholds.ram.recovery", 75.0);
     }
 
     /**
-     * Called by TPSMonitor on every check cycle.
+     * Delegates to EmergencyController for actual state management.
+     * Kept for backward compatibility with TPSMonitor's existing call.
      */
     public void onTick(double currentTps, double ramUsagePercent) {
-        if (!enabled)
-            return;
+        int onlinePlayers = Bukkit.getOnlinePlayers().size();
+        int activePlayers = onlinePlayers; // Simplified; could track movement
 
-        boolean critical = (currentTps < criticalTps) || (ramUsagePercent > criticalRam);
-        boolean safe = (currentTps > recoveryTps) && (ramUsagePercent < recoveryRam);
-
-        if (!active && critical) {
-            activateShield();
-        } else if (active && safe) {
-            deactivateShield();
-        }
+        EmergencyController.getInstance().evaluate(
+                currentTps, ramUsagePercent, onlinePlayers, activePlayers);
     }
 
-    private void activateShield() {
-        active = true;
-        LagXpert.getInstance().getLogger().warning("[LagShield] 🛡️ Critical performance detected! Activating shield.");
-
-        if (ConfigManager.isAlertsModuleEnabled()) {
-            // Broadcast alert
-            String msg = MessageManager.get("alerts.messages.lagshield.activated");
-            if (msg != null && !msg.isEmpty()) {
-                Bukkit.broadcastMessage(msg);
-            }
-        }
-
-        // Execute emergency commands or adjustments here
-        // Example: Run command to clear ground items if configured
-        // In a real implementation, we would toggle flags in other managers
-    }
-
-    private void deactivateShield() {
-        active = false;
-        LagXpert.getInstance().getLogger().info("[LagShield] 🟢 Performance recovered. Deactivating shield.");
-
-        if (ConfigManager.isAlertsModuleEnabled()) {
-            String msg = MessageManager.get("alerts.messages.lagshield.deactivated");
-            if (msg != null && !msg.isEmpty()) {
-                Bukkit.broadcastMessage(msg);
-            }
-        }
-    }
-
+    /**
+     * @deprecated Use {@link EmergencyController#getCurrentState()} == ServerState.NORMAL instead.
+     */
+    @Deprecated
     public boolean isActive() {
-        return enabled && active;
+        return enabled && EmergencyController.getInstance().getCurrentState() !=
+                EmergencyController.ServerState.NORMAL;
     }
 
+    /**
+     * @deprecated Use {@link EmergencyController#getMobCapMultiplier()} instead.
+     */
+    @Deprecated
     public double getMobCapMultiplier() {
-        return isActive() ? mobCapMultiplier : 1.0;
+        return EmergencyController.getInstance().getMobCapMultiplier();
     }
 
+    /**
+     * @deprecated Use {@link EmergencyController#shouldBlockNaturalSpawns()} instead.
+     */
+    @Deprecated
     public boolean shouldBlockNaturalSpawns() {
-        return isActive() && blockNaturalSpawns;
+        return EmergencyController.getInstance().shouldBlockNaturalSpawns();
     }
 }

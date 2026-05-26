@@ -66,3 +66,13 @@ alert-cooldown:
   # will not be re-sent to that player until this many seconds have passed.
   # Set to 0 to disable alert cooldowns.
   default-seconds: 15
+
+# -----------------------------------------------------------------------------
+# Global Rate Limiting (v2.7+)
+# Prevents alert storms across ALL alert types simultaneously.
+# -----------------------------------------------------------------------------
+global-rate-limit:
+  # Maximum total alerts per second across all types and all players
+  # Alerts exceeding this limit are silently dropped
+  # Set to 0 to disable global rate limiting (not recommended)
+  max-alerts-per-second: 10

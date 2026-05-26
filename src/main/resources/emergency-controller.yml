@@ -1,0 +1,133 @@
+# Emergency Controller Configuration
+# Reactive state machine that dynamically adjusts server limits based on
+# real-time performance metrics (TPS, memory, player count).
+#
+# Replaces the old inert LagShield with actual graduated responses.
+# Each server state applies different levels of corrective action.
+#
+# State progression: NORMAL → WARNING → CRITICAL → EMERGENCY
+#   Escalation: 3 consecutive bad readings required
+#   De-escalation: 5 consecutive good readings required
+#   Minimum 10 seconds between state changes (prevents flapping)
+
+enabled: true
+
+# Stability settings — prevent false positives and flapping
+stability:
+  # Do not evaluate when no players are online (prevents false alarms during restarts)
+  skip-when-no-players-online: true
+
+  # Minimum consecutive bad readings before escalating
+  escalation-confirmation-readings: 3
+
+  # Minimum consecutive good readings before de-escalating
+  de-escalation-confirmation-readings: 5
+
+  # Minimum time (seconds) to stay in a state before transitioning
+  min-state-duration-seconds: 10
+
+  # Never go into EMERGENCY if fewer than this many players are online
+  min-players-for-emergency: 5
+
+# Performance thresholds that trigger state changes
+thresholds:
+  tps:
+    # TPS below this = consider CRITICAL
+    critical: 15.0
+    # TPS below this = consider WARNING
+    warning: 18.0
+    # TPS above this AND RAM below recovery = consider NORMAL
+    recovery: 19.0
+
+  ram:
+    # RAM usage above this = consider CRITICAL
+    critical: 90.0
+    # RAM usage above this = consider WARNING
+    warning: 85.0
+    # RAM usage below this AND TPS above recovery = consider NORMAL
+    recovery: 75.0
+
+# Graduated responses applied in each server state
+responses:
+  # WARNING state — mild restrictions, mostly invisible to players
+  warning:
+    # Multiply mob limits by this value (0.75 = 75% of normal limit)
+    mob-cap-multiplier: 0.75
+
+    # Block natural mob spawning entirely
+    block-natural-spawns: false
+
+    # Force an immediate item cleanup cycle
+    force-item-cleanup: false
+
+    # Use aggressive chunk unloading (lower inactivity threshold)
+    aggressive-chunk-unload: false
+
+    # Pause chunk preloading to reduce I/O
+    pause-chunk-preloader: true
+
+    # Disable detected redstone clock circuits
+    disable-redstone-clocks: false
+
+    # Distance (blocks) threshold for AI optimization
+    # Mobs farther than this from players get AI simplified/disabled
+    ai-distance-threshold: 48
+
+    # Broadcast state change to players with permission
+    broadcast-alert: false
+
+    # Override inactivity threshold for chunk unloading (minutes)
+    unload-inactivity-minutes: 15
+
+    # Disable AI on ALL mobs (extreme, use with caution)
+    freeze-all-ai: false
+
+  # CRITICAL state — significant restrictions, players will notice
+  critical:
+    mob-cap-multiplier: 0.5
+    block-natural-spawns: true
+    force-item-cleanup: true
+    aggressive-chunk-unload: true
+    unload-inactivity-minutes: 2
+    pause-chunk-preloader: true
+    disable-redstone-clocks: true
+    ai-distance-threshold: 32
+    broadcast-alert: true
+    freeze-all-ai: false
+
+  # EMERGENCY state — extreme measures, gameplay significantly affected
+  emergency:
+    mob-cap-multiplier: 0.25
+    block-natural-spawns: true
+    force-item-cleanup: true
+    aggressive-chunk-unload: true
+    unload-inactivity-minutes: 1
+    pause-chunk-preloader: true
+    disable-redstone-clocks: true
+    ai-distance-threshold: 16
+    broadcast-alert: true
+    freeze-all-ai: false
+
+    # Server commands to execute when entering EMERGENCY state
+    # Use with caution — these run as console
+    # Example:
+    # emergency-commands:
+    #   - "save-all"
+    #   - "say &c[LagXpert] Emergency optimization active - expect reduced functionality"
+    emergency-commands: []
+
+# Recovery settings — when to return to NORMAL
+recovery:
+  # Automatically de-escalate when metrics improve
+  auto-de-escalate: true
+
+  # Broadcast recovery message to players
+  broadcast-recovery: true
+
+# Manual override controls
+manual:
+  # Allow admins to force-return to NORMAL state via /lagxpert emergency force-normal
+  allow-force-normal: true
+
+  # Permission required for manual override
+  force-normal-permission: "lagxpert.admin.emergency"

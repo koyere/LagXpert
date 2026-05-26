@@ -1,7 +1,9 @@
 package me.koyere.lagxpert.tasks;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.system.ActionLogger;
 import me.koyere.lagxpert.system.ChunkManager;
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -83,6 +85,15 @@ public class InactiveChunkUnloader extends BukkitRunnable {
         if (totalUnloaded > 0) {
             long estimatedMemorySaved = totalUnloaded * 1024L; // Rough estimate
             ChunkManager.recordChunkUnload(totalUnloaded, estimatedMemorySaved);
+
+            // Log corrective action to audit trail
+            String triggeredBy = EmergencyController.getInstance().shouldAggressiveChunkUnload()
+                    ? "emergency" : "auto";
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.CHUNK_UNLOADED,
+                    null, null,
+                    "Cycle: " + totalUnloaded + " chunks unloaded",
+                    totalUnloaded, triggeredBy, true, cycleTime);
         }
 
         // Broadcast results if enabled and threshold met

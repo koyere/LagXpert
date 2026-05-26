@@ -234,7 +234,7 @@ public class SmartMobManager {
             return 0;
         }
         
-        int mobLimit = ConfigManager.getMaxMobsPerChunk(chunk.getWorld());
+        int mobLimit = EmergencyController.getInstance().getEffectiveMobLimit(chunk.getWorld());
         List<LivingEntity> livingEntities = mobData.getLivingEntities();
         int currentCount = livingEntities.size();
         
@@ -263,6 +263,19 @@ public class SmartMobManager {
         
         // Update processing timestamp
         chunkLastProcessed.put(getChunkKey(chunk), System.currentTimeMillis());
+        
+        // Log corrective action to audit trail
+        if (actuallyRemoved > 0) {
+            String chunkKey = getChunkKey(chunk);
+            String triggeredBy = EmergencyController.getInstance().getCurrentState() != 
+                    EmergencyController.ServerState.NORMAL ? "emergency" : "auto";
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.MOB_REMOVED_BULK,
+                    chunk.getWorld().getName(),
+                    chunkKey,
+                    "Removed: " + actuallyRemoved + ", Original: " + currentCount + ", Limit: " + mobLimit,
+                    actuallyRemoved, triggeredBy, true, 0);
+        }
         
         // Notify nearby players if configured
         if (actuallyRemoved > 0 && ConfigManager.shouldNotifyMobRemoval()) {

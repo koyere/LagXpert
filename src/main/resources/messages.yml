@@ -44,6 +44,9 @@ help:
   abyss: " &e/abyss &8- &7Recover recently cleared items."
   reload: " &e/lagxpert reload &8- &7Reload all configuration files."
   clearitems: " &e/clearitems [all|world] &8- &7Manually clear dropped items."
+  optimize: " &e/lagxpert optimize &8- &7Run full optimization pass."
+  status: " &e/lagxpert status &8- &7Show performance dashboard."
+  emergency: " &e/lagxpert emergency [status|force-normal] &8- &7Emergency controls."
 
 # == /lagxpert inspect Command ==
 inspect:
@@ -157,10 +160,18 @@ alerts:
     # Lag Spike Alert Messages
     lag-spike: "&c[LAG SPIKE] &fDetected lag spike: &c{tick_time}ms&f tick duration"
 
-    # LagShield Messages
+    # LagShield Messages (legacy, kept for backward compatibility)
     lagshield:
       activated: "&c[LagShield] &7Performance Critical! &cTurning on emergency protections."
       deactivated: "&a[LagShield] &7Performance Stabilized. &aRestoring normal operations."
+
+    # Emergency Controller Messages
+    emergency-controller:
+      warning-activated: "&e[LagXpert] &7Server performance is degrading. &eLight optimizations active."
+      critical-activated: "&c[LagXpert] &7Critical performance detected! &cEmergency optimizations active."
+      emergency-activated: "&4[LagXpert] &7Severe performance crisis! &4Extreme measures in effect."
+      recovery-activated: "&a[LagXpert] &7Server performance has recovered. &aAll restrictions lifted."
+      force-normal: "&a[LagXpert] &7Emergency state manually cleared by administrator."
 
 # == Custom Translations for Block & Entity Names ==
 # These names appear in /chunkstatus, /lagxpert inspect, scan alerts, and near-limit warnings.

@@ -1,4 +1,4 @@
-# LagXpert v2.2 - General Configuration
+# LagXpert v2.7 - General Configuration
 # Multi-platform support: Folia, Paper, Spigot, Bukkit
 # Bedrock compatibility: Geyser & Floodgate integration
 # Smart optimization: Intelligent mob management
@@ -7,7 +7,7 @@
 # Use this file to enable or disable core functionalities and set global options.
 
 # Configuration version (DO NOT MODIFY)
-config-version: "2.5"
+config-version: "2.7"
 
 # 🧩 Modules Activation
 # Activate or deactivate main plugin functionalities.
@@ -78,6 +78,12 @@ modules:
   # Optimizes GUIs and features for Bedrock players.
   bedrock-compatibility: true
 
+  # NEW v2.7: Enables the Emergency Controller state machine.
+  # Automatically adjusts server limits based on real-time TPS/memory metrics.
+  # Provides graduated responses: NORMAL → WARNING → CRITICAL → EMERGENCY.
+  # Detailed settings are in 'emergency-controller.yml'.
+  emergency-controller: true
+
 # 🧠 Debug Mode
 # If true, LagXpert will output additional information to the server console,
 # which can be helpful for diagnosing issues or understanding plugin behavior.
@@ -130,6 +136,39 @@ performance:
 
 # Removed 'permissions.bypass-enabled' as it was not implemented.
 # Bypass functionality is handled by individual Bukkit permissions (e.g., lagxpert.bypass.mobs).
+
+# 📝 Action Logger Settings (v2.7+)
+# Records every corrective action the plugin takes for audit and diagnostics.
+action-logger:
+  # Maximum entries in the circular buffer before oldest are dropped
+  max-entries: 10000
+
+# 📊 Adaptive Thresholds (v2.9+)
+# Dynamically adjusts all limits based on real-time server health.
+# When TPS drops or memory usage rises, limits are proportionally reduced.
+adaptive-thresholds:
+  # Master toggle for adaptive thresholds
+  enabled: true
+
+  # Sensitivity per limit category (0.0 = no adjustment, 1.0 = full adjustment)
+  # Lower sensitivity = limits change less aggressively when server is stressed
+  sensitivity:
+    mobs: 1.0       # Mobs are fully sensitive to server health
+    storage: 0.7    # Storage blocks less sensitive (player builds shouldn't vanish)
+    entities: 1.0   # Entity cleanup thresholds fully sensitive
+    redstone: 1.0   # Redstone circuit limits fully sensitive
+
+# 📈 Performance History (v2.9+)
+# Collects periodic snapshots for trend analysis and peak prediction.
+performance-history:
+  # Enable periodic snapshot collection
+  enabled: true
+
+  # Interval between snapshots (seconds, 300 = 5 minutes)
+  snapshot-interval-seconds: 300
+
+  # Maximum days of history to keep (older snapshots are discarded)
+  max-history-days: 7
 
 # 🌐 NEW v2.2: Platform Detection & Multi-Platform Support
 # Automatically detects and optimizes for different server platforms

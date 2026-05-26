@@ -1,0 +1,89 @@
+# Optimization Profiles
+# Pre-configured optimization presets for different server scenarios.
+# Apply with: /lagxpert profile <name>
+# Auto-reverts after 10 minutes if admin disconnects (safety feature).
+#
+# Each profile overrides specific config values when applied.
+# Missing keys use the current config defaults.
+
+profiles:
+  # Good for small servers (< 20 players) — minimal restrictions
+  relaxed:
+    description: "Relaxed limits for small servers"
+    limits:
+      mobs-per-chunk: 50
+      hoppers-per-chunk: 12
+      chests-per-chunk: 30
+    item-cleaner:
+      interval-ticks: 18000    # 15 minutes
+    chunks:
+      unload-inactivity-minutes: 30
+      preload-radius: 5
+    mobs:
+      ai-optimizer-enabled: true
+      ai-distance-threshold: 64
+
+  # Default balanced profile — good for most servers
+  balanced:
+    description: "Balanced optimization for medium servers"
+    limits:
+      mobs-per-chunk: 40
+      hoppers-per-chunk: 8
+      chests-per-chunk: 20
+    item-cleaner:
+      interval-ticks: 6000     # 5 minutes
+    chunks:
+      unload-inactivity-minutes: 15
+      preload-radius: 4
+    mobs:
+      ai-optimizer-enabled: true
+      ai-distance-threshold: 64
+
+  # For large servers (> 50 players) or low-end hardware
+  aggressive:
+    description: "Aggressive optimization for large servers or weak hardware"
+    limits:
+      mobs-per-chunk: 25
+      hoppers-per-chunk: 5
+      chests-per-chunk: 12
+      tnt-per-chunk: 3
+    item-cleaner:
+      interval-ticks: 3000     # 2.5 minutes
+    chunks:
+      unload-inactivity-minutes: 5
+      preload-radius: 2
+    mobs:
+      ai-optimizer-enabled: true
+      ai-distance-threshold: 48
+    adaptive-thresholds:
+      enabled: true
+
+  # Maximum optimization — may impact gameplay, use for events or crisis
+  performance:
+    description: "Maximum performance — use during events or heavy load"
+    limits:
+      mobs-per-chunk: 15
+      hoppers-per-chunk: 3
+      chests-per-chunk: 8
+      tnt-per-chunk: 0
+    item-cleaner:
+      interval-ticks: 1200     # 1 minute
+    chunks:
+      unload-inactivity-minutes: 2
+      preload-radius: 0        # disabled
+    mobs:
+      ai-optimizer-enabled: true
+      ai-distance-threshold: 32
+    adaptive-thresholds:
+      enabled: true
+    redstone:
+      disable-clocks: true
+
+# Safety settings
+safety:
+  # Auto-revert profile to 'balanced' after this many minutes
+  # Set to 0 to disable auto-revert
+  auto-revert-minutes: 10
+
+  # Permission required to switch profiles
+  permission: "lagxpert.admin.profile"

@@ -1,6 +1,7 @@
 package me.koyere.lagxpert.monitoring;
 
 import me.koyere.lagxpert.LagXpert;
+import me.koyere.lagxpert.system.AlertPipeline;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -440,36 +441,31 @@ public class PerformanceTracker extends BukkitRunnable {
     }
 
     /**
-     * Broadcasts an alert to console and eligible players.
+     * Broadcasts an alert to console and eligible players via the unified AlertPipeline.
      * Enhanced to check if players are online before sending performance alerts.
      */
     private void broadcastAlert(String message) {
-        // Check if there are any players online
         boolean hasPlayersOnline = !Bukkit.getOnlinePlayers().isEmpty();
         boolean skipWhenNoPlayers = ConfigManager.shouldSkipAlertsWhenNoPlayersOnline();
 
-        // Send to console if enabled
-        if (ConfigManager.shouldSendAlertsToConsole()) {
-            LagXpert.getInstance().getLogger().warning(MessageManager.color(message).replaceAll("§[0-9a-fk-or]", ""));
+        // Determine target based on player presence
+        AlertPipeline.AlertTarget target;
+        if (!hasPlayersOnline && skipWhenNoPlayers) {
+            target = AlertPipeline.AlertTarget.CONSOLE;
+        } else {
+            target = AlertPipeline.AlertTarget.PLAYERS_WITH_PERMISSION;
         }
 
-        // Send to players if enabled and there are players online
-        if (ConfigManager.shouldSendAlertsToPlayers() && (!skipWhenNoPlayers || hasPlayersOnline)) {
-            String permission = ConfigManager.getPlayerAlertPermission();
-            String coloredMessage = MessageManager.color(message);
+        AlertPipeline.AlertContext ctx = AlertPipeline.AlertContext
+                .builder(AlertPipeline.AlertLevel.WARNING, "performance-alert")
+                .rawMessage(message)
+                .target(target)
+                .permission(ConfigManager.getPlayerAlertPermission())
+                .logToConsole(ConfigManager.shouldSendAlertsToConsole())
+                .logToActionLogger(true)
+                .build();
 
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (player.hasPermission(permission)) {
-                    player.sendMessage(coloredMessage);
-                }
-            }
-        } else if (skipWhenNoPlayers && !hasPlayersOnline && ConfigManager.isDebugEnabled()) {
-            // Log when alerts are skipped due to no players online
-            LagXpert.getInstance().getLogger().info(
-                "[PerformanceTracker] Skipped player alert (no players online): " + 
-                MessageManager.color(message).replaceAll("§[0-9a-fk-or]", "")
-            );
-        }
+        AlertPipeline.getInstance().send(ctx);
     }
 
     /**

@@ -8,24 +8,35 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Filter;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Filters console logging to prevent spam.
  * Injects a filter into the root logger.
+ *
+ * Fixed in Phase 2:
+ *   - Thread-safe: CopyOnWriteArrayList for patterns, AtomicBoolean for state.
+ *   - Chain of responsibility: preserves existing filter if present.
+ *   - Hot-reloadable patterns without removing/re-injecting filter.
+ *   - Forwarding uses async scheduling to avoid blocking logger thread.
+ *   - Proper cleanup on shutdown restoring original filter.
  */
 public class ConsoleFilter implements Filter {
 
-    private boolean enabled;
-    private List<Pattern> patterns;
+    private volatile boolean enabled;
+    private final List<Pattern> patterns = new CopyOnWriteArrayList<>();
+    private final AtomicBoolean injected = new AtomicBoolean(false);
     private boolean forwardToAdmins;
     private String forwardPermission;
-    private boolean initialized = false;
+
+    private Filter chainedFilter;
 
     public ConsoleFilter() {
         reloadConfig();
@@ -34,43 +45,56 @@ public class ConsoleFilter implements Filter {
     public void reloadConfig() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "console-filter.yml");
         if (!file.exists()) {
-            // Default config handled by saveDefaultConfigurations? Or create manually here?
-            // Assuming created by saveDefaultConfigurations or similar step.
             return;
         }
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
 
+        boolean wasEnabled = this.enabled;
         this.enabled = config.getBoolean("enabled", true);
         this.forwardToAdmins = config.getBoolean("forward-to-admins", false);
         this.forwardPermission = config.getString("forward-permission", "lagxpert.console.view-filtered");
 
-        this.patterns = new ArrayList<>();
+        // Reload patterns (thread-safe Clear + add)
+        this.patterns.clear();
         List<String> regexList = config.getStringList("filters");
         for (String regex : regexList) {
             try {
                 patterns.add(Pattern.compile(regex));
-            } catch (Exception e) {
-                LagXpert.getInstance().getLogger().warning("[ConsoleFilter] Invalid regex pattern: " + regex);
+            } catch (PatternSyntaxException e) {
+                LagXpert.getInstance().getLogger().warning(
+                        "[ConsoleFilter] Invalid regex pattern: " + regex + " — " + e.getMessage());
             }
         }
 
-        if (enabled && !initialized) {
+        // Handle injection state changes
+        if (enabled && !injected.get()) {
             injectFilter();
-            initialized = true;
-        } else if (!enabled && initialized) {
+        } else if (!enabled && injected.get()) {
             removeFilter();
-            initialized = false;
         }
     }
 
     private void injectFilter() {
-        getLogger().setFilter(this);
-        LagXpert.getInstance().getLogger().info("[ConsoleFilter] Injected into root logger.");
+        Logger rootLogger = getLogger();
+
+        // Preserve existing filter for chain of responsibility
+        Filter existingFilter = rootLogger.getFilter();
+        if (existingFilter != null && existingFilter != this) {
+            this.chainedFilter = existingFilter;
+        }
+
+        rootLogger.setFilter(this);
+        injected.set(true);
+        LagXpert.getInstance().getLogger().info(
+                "[ConsoleFilter] Injected into root logger. " + patterns.size() + " patterns active.");
     }
 
     private void removeFilter() {
         if (getLogger().getFilter() == this) {
-            getLogger().setFilter(null);
+            // Restore chained filter if it existed
+            getLogger().setFilter(chainedFilter);
+            chainedFilter = null;
+            injected.set(false);
         }
     }
 
@@ -80,35 +104,50 @@ public class ConsoleFilter implements Filter {
 
     @Override
     public boolean isLoggable(LogRecord record) {
-        if (!enabled)
-            return true;
+        if (!enabled) {
+            return passThrough(record);
+        }
 
         String message = record.getMessage();
-        if (message == null)
-            return true;
+        if (message == null) {
+            return passThrough(record);
+        }
 
         for (Pattern pattern : patterns) {
             if (pattern.matcher(message).matches()) {
+                // Forward filtered message to admins if configured
                 if (forwardToAdmins) {
-                    forwardMessageToAdmins(message);
+                    // Schedule async to avoid blocking the logger thread
+                    final String msg = message;
+                    Bukkit.getScheduler().runTask(LagXpert.getInstance(),
+                            () -> forwardMessageToAdmins(msg));
                 }
-                return false; // Filter out (hide)
+
+                // Still pass through chained filter
+                if (chainedFilter != null) {
+                    return chainedFilter.isLoggable(record);
+                }
+                return false; // Filtered out
             }
         }
 
-        return true; // Pass through
+        return passThrough(record);
+    }
+
+    /**
+     * Passes the log record through the chained filter if present.
+     */
+    private boolean passThrough(LogRecord record) {
+        if (chainedFilter != null) {
+            return chainedFilter.isLoggable(record);
+        }
+        return true;
     }
 
     private void forwardMessageToAdmins(String message) {
-        // Maybe run async to not block logging thread?
-        // Logging is usually sync? Buikit might not be thread safe here if logging from
-        // async thread.
-        // But for sendMessage it should be fine mostly or schedule it.
-
-        // Simple implementation:
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (p.hasPermission(forwardPermission)) {
-                p.sendMessage(MessageManager.color("&8[Filtered] " + message));
+                p.sendMessage(MessageManager.color("&8[Filtered] &7" + message));
             }
         }
     }

@@ -5,23 +5,25 @@ enabled: true
 
 # 🚀 Elytra Settings
 elytra:
-  # Limit flight speed (blocks per second)
+  # Limit flight speed (blocks per tick multiplier)
   # High speeds generate too many chunks too fast
-  speed-limit: 1.5 # Multiplier of normal speed
-  
-  # Action when speeding
-  action: "rubberband" # Options: rubberband, cancel, damage
-  
-  # Check interval (ticks)
-  check-interval: 10
+  speed-limit: 1.5
+
+  # Velocity multiplier applied when speed limit is exceeded
+  # 0.5 = slow to half speed, 0.0 = full stop
+  slowdown-factor: 0.5
 
 # 🔱 Trident Settings
 trident:
   # Cooldown between Riptide launches (milliseconds)
   riptide-cooldown: 2000
-  
+
   # Disable Riptide entirely?
   disable-riptide: false
+
+  # Velocity reversal multiplier when on cooldown
+  # -0.5 = bounce back at half speed, 0.0 = full stop
+  riptide-reversal-factor: -0.5
 
 # 🌍 World Settings
 disabled-worlds:

@@ -2,6 +2,7 @@ package me.koyere.lagxpert.tasks;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.system.ChunkManager;
+import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
 import org.bukkit.Bukkit;
@@ -113,6 +114,16 @@ public class ChunkPreloader extends BukkitRunnable {
     @Override
     public void run() {
         if (!ConfigManager.isChunkManagementModuleEnabled() || !ConfigManager.isChunkPreloadEnabled()) {
+            return;
+        }
+
+        // Pause preloading during emergency/critical states to reduce I/O load
+        if (EmergencyController.getInstance().shouldPauseChunkPreloader()) {
+            if (ConfigManager.isChunkDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info(
+                        "[ChunkPreloader] Skipping cycle — paused by EmergencyController (state: " +
+                        EmergencyController.getInstance().getCurrentState().name() + ")");
+            }
             return;
         }
 

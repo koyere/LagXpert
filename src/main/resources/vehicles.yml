@@ -4,31 +4,41 @@
 enabled: true
 
 # 📊 Limits
-# Maximum vehicles per chunk. Excess vehicles will be removed or prevented.
+# Maximum vehicles per chunk. Excess vehicles will be prevented on spawn.
 limits:
-  # Global limits
   minecarts:
     per-chunk: 8
-    check-radius: 4 # Check radius for stacked limit/collision checks
-  
+
   boats:
     per-chunk: 5
 
 # 🧹 Cleanup Settings
+# Periodic cleanup of abandoned vehicles.
 cleanup:
-  # Automatically remove minecarts in mineshafts that contain loot but were abandoned
-  # (Requires scanning NBT, can be slightly heavy, so it runs periodically)
-  remove-abandoned-loot-carts: true
-  
-  # Remove boats/carts that have been empty for a long time?
-  remove-empty-vehicles: true
-  empty-timeout-seconds: 300 # 5 minutes
+  # Enable automatic removal of abandoned vehicles
+  remove-abandoned-vehicles: true
+
+  # Time (seconds) a vehicle must be empty before considered abandoned
+  abandoned-timeout-seconds: 300
+
+  # Maximum vehicles to remove per cleanup cycle (prevents lag spikes)
+  max-removals-per-cycle: 50
+
+  # Cleanup task scheduling
+  # Initial delay before first cleanup (ticks, 20 ticks = 1 second)
+  initial-delay-ticks: 600
+  # Interval between cleanup cycles (ticks, 6000 = 5 minutes)
+  interval-ticks: 6000
+
+  # Radius (blocks) around players where vehicles are protected from removal
+  # Prevents removing vehicles that players might be actively using
+  player-nearby-radius: 16
 
 # 🧪 Optimizations
 optimization:
   # If true, vehicles without passengers that are not moving will stop processing physics/collision
   disable-physics-for-empty: true
-  
+
   # Prevent collision checks for vehicles in full chunks
   reduce-collision-checks: true
 

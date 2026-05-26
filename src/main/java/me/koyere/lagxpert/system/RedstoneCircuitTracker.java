@@ -7,7 +7,10 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,11 +28,31 @@ public class RedstoneCircuitTracker {
     private static final Map<String, AtomicInteger> pulseCounters = new ConcurrentHashMap<>();
     private static final Set<String> whitelistedCircuits = ConcurrentHashMap.newKeySet();
 
-    // Configuration constants
-    private static final long CIRCUIT_TIMEOUT_MS = 60000; // 1 minute of inactivity = circuit considered dead
-    private static final long PULSE_MEASUREMENT_WINDOW_MS = 10000; // Measure pulses over 10 seconds
-    private static final int MAX_PULSES_PER_WINDOW = 200; // Maximum allowed pulses in measurement window
-    private static final long CLEANUP_INTERVAL_TICKS = 1200L; // Cleanup every minute (20 ticks * 60)
+    // Configuration constants (loaded from redstone.yml, defaults shown)
+    private static long circuitTimeoutMs = 60000;
+    private static long pulseMeasurementWindowMs = 10000;
+    private static int maxPulsesPerWindow = 200;
+    private static long cleanupIntervalTicks = 1200L;
+    private static int maxCircuitSize = 200;
+    private static int maxBreaksPerShutdown = 50;
+    private static int escalateThreshold = 3;
+    private static boolean floodFillEnabled = true;
+
+    // Per-circuit-type durations and grace periods (milliseconds)
+    private static long maxDurationContinuous = 300000L;
+    private static long maxDurationComplex = 600000L;
+    private static long maxDurationPulse = 60000L;
+    private static long maxDurationDefault = 180000L;
+    private static long gracePeriodClock = 10000L;
+    private static long gracePeriodContinuous = 30000L;
+    private static long gracePeriodComplex = 60000L;
+    private static long gracePeriodDefault = 20000L;
+
+    // Detection parameters
+    private static int nearbyRepeaterRadius = 3;
+    private static int complexPatternRadiusXZ = 2;
+    private static int complexPatternRadiusY = 1;
+    private static int complexPatternThreshold = 5;
 
     /**
      * Represents a tracked redstone circuit with its properties and activity data.
@@ -164,7 +187,7 @@ public class RedstoneCircuitTracker {
             case REPEATER:
             case COMPARATOR:
                 // Check for clock patterns by looking at nearby repeaters
-                if (hasNearbyRepeaters(location, 3)) {
+                if (hasNearbyRepeaters(location, nearbyRepeaterRadius)) {
                     return CircuitType.CLOCK;
                 }
                 return CircuitType.PULSE;
@@ -211,9 +234,9 @@ public class RedstoneCircuitTracker {
         if (center.getWorld() == null) return false;
 
         int redstoneComponents = 0;
-        for (int x = -2; x <= 2; x++) {
-            for (int y = -1; y <= 1; y++) {
-                for (int z = -2; z <= 2; z++) {
+        for (int x = -complexPatternRadiusXZ; x <= complexPatternRadiusXZ; x++) {
+            for (int y = -complexPatternRadiusY; y <= complexPatternRadiusY; y++) {
+                for (int z = -complexPatternRadiusXZ; z <= complexPatternRadiusXZ; z++) {
                     Block block = center.clone().add(x, y, z).getBlock();
                     if (isRedstoneComponent(block.getType())) {
                         redstoneComponents++;
@@ -221,7 +244,7 @@ public class RedstoneCircuitTracker {
                 }
             }
         }
-        return redstoneComponents >= 5; // 5+ redstone components = complex
+        return redstoneComponents >= complexPatternThreshold;
     }
 
     /**
@@ -252,6 +275,12 @@ public class RedstoneCircuitTracker {
             return;
         }
 
+        // EmergencyController: disable all clocks during emergency/critical
+        if (EmergencyController.getInstance().shouldDisableRedstoneClocks()) {
+            scheduleCircuitShutdown(circuit, "emergency_disable", 0);
+            return;
+        }
+
         long currentTime = System.currentTimeMillis();
         String locationKey = circuit.getCircuitId();
 
@@ -261,7 +290,7 @@ public class RedstoneCircuitTracker {
             // Reset counter and check if it exceeded limits
             int pulsesInWindow = pulseCounter.getAndSet(0);
 
-            if (pulsesInWindow > MAX_PULSES_PER_WINDOW) {
+            if (pulsesInWindow > maxPulsesPerWindow) {
                 scheduleCircuitShutdown(circuit, "high_frequency", getGracePeriod(circuit.getType()));
                 return;
             }
@@ -301,24 +330,41 @@ public class RedstoneCircuitTracker {
     }
 
     /**
-     * Actually shuts down a circuit by breaking the redstone wire.
+     * Actually shuts down a circuit using flood-fill to find ALL connected
+     * redstone components, then breaks the circuit at its weakest points.
+     * If flood-fill fails (too large / errors), falls back to single-block break.
      */
     private static void shutdownCircuit(RedstoneCircuit circuit, String reason) {
-        Location location = circuit.getPrimaryLocation();
-        if (location.getWorld() == null || !location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+        Location origin = circuit.getPrimaryLocation();
+        if (origin.getWorld() == null ||
+                !origin.getWorld().isChunkLoaded(origin.getBlockX() >> 4, origin.getBlockZ() >> 4)) {
             return;
         }
 
-        Block block = location.getBlock();
-        if (block.getType() == Material.REDSTONE_WIRE) {
-            block.setType(Material.AIR);
-
-            if (ConfigManager.isDebugEnabled()) {
-                LagXpert.getInstance().getLogger().info(
-                        "[RedstoneCircuitTracker] Shutdown circuit at " + locationToString(location) +
-                                " due to: " + reason
-                );
+        int broken;
+        if (floodFillEnabled) {
+            try {
+                // Attempt flood-fill to find all connected redstone components
+                Set<Location> circuitBlocks = floodFillCircuit(origin);
+                broken = breakCircuitBlocks(circuitBlocks, origin.getWorld());
+            } catch (Exception e) {
+                // Fallback: break just the origin block
+                LagXpert.getInstance().getLogger().warning(
+                        "[RedstoneCircuitTracker] Flood-fill failed, falling back to single-block break: " +
+                                e.getMessage());
+                broken = breakSingleBlock(origin);
             }
+        } else {
+            broken = breakSingleBlock(origin);
+        }
+
+        if (broken > 0) {
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.REDSTONE_CIRCUIT_BROKEN,
+                    origin.getWorld() != null ? origin.getWorld().getName() : "-",
+                    circuit.getCircuitId(),
+                    "Reason: " + reason + ", Type: " + circuit.getType().name() + ", Blocks broken: " + broken,
+                    broken, "auto", true, 0);
         }
 
         // Remove from tracking
@@ -329,36 +375,132 @@ public class RedstoneCircuitTracker {
     }
 
     /**
+     * Flood-fill algorithm: finds all connected redstone component blocks
+     * starting from the origin location. Uses BFS with a safety cap.
+     */
+    private static Set<Location> floodFillCircuit(Location start) {
+        Set<Location> visited = new HashSet<>();
+        Queue<Location> queue = new LinkedList<>();
+        queue.add(start.clone());
+
+        while (!queue.isEmpty() && visited.size() < maxCircuitSize) {
+            Location current = queue.poll();
+            if (!visited.add(current)) continue;
+            if (current.getWorld() == null) continue;
+
+            // Check all 6 adjacent blocks (not diagonals — redstone connects face-to-face)
+            int[][] offsets = {{1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}};
+            for (int[] offset : offsets) {
+                Location neighbor = current.clone().add(offset[0], offset[1], offset[2]);
+                if (visited.contains(neighbor)) continue;
+
+                if (isRedstoneComponent(neighbor.getBlock().getType())) {
+                    queue.add(neighbor);
+                }
+            }
+        }
+
+        return visited;
+    }
+
+    /**
+     * Breaks redstone components in the identified circuit blocks.
+     * Prioritizes redstone wire (safest to break), then repeaters/comparators.
+     * Drops items naturally so players can recover materials.
+     */
+    private static int breakCircuitBlocks(Set<Location> circuitBlocks, org.bukkit.World world) {
+        int broken = 0;
+
+        // First pass: break redstone wires (safest, least destructive)
+        for (Location loc : circuitBlocks) {
+            if (broken >= maxBreaksPerShutdown) break;
+            if (!world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) continue;
+
+            org.bukkit.block.Block block = loc.getBlock();
+            if (block.getType() == Material.REDSTONE_WIRE ||
+                    block.getType() == Material.REDSTONE_TORCH ||
+                    block.getType() == Material.REDSTONE_WALL_TORCH) {
+                block.breakNaturally();
+                broken++;
+            }
+        }
+
+        // Second pass: if circuit still likely active, break repeaters/comparators
+        if (broken < escalateThreshold) {
+            for (Location loc : circuitBlocks) {
+                if (broken >= maxBreaksPerShutdown) break;
+                if (!world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) continue;
+
+                org.bukkit.block.Block block = loc.getBlock();
+                if (block.getType() == Material.REPEATER ||
+                        block.getType() == Material.COMPARATOR) {
+                    block.breakNaturally();
+                    broken++;
+                }
+            }
+        }
+
+        // Third pass: if STILL no blocks broken, break any redstone component
+        if (broken == 0) {
+            for (Location loc : circuitBlocks) {
+                if (broken >= maxBreaksPerShutdown) break;
+                if (!world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) continue;
+
+                org.bukkit.block.Block block = loc.getBlock();
+                if (isRedstoneComponent(block.getType()) && block.getType() != Material.REDSTONE_BLOCK) {
+                    block.breakNaturally();
+                    broken++;
+                }
+            }
+        }
+
+        return broken;
+    }
+
+    /**
+     * Fallback: breaks a single redstone wire block at the origin.
+     */
+    private static int breakSingleBlock(Location location) {
+        if (location.getWorld() == null ||
+                !location.getWorld().isChunkLoaded(location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
+            return 0;
+        }
+        org.bukkit.block.Block block = location.getBlock();
+        if (block.getType() == Material.REDSTONE_WIRE) {
+            block.breakNaturally();
+            return 1;
+        }
+        return 0;
+    }
+
+    /**
      * Gets the maximum allowed duration for a circuit type.
      */
     private static long getMaxDuration(CircuitType type) {
         switch (type) {
             case CLOCK:
-                return ConfigManager.getRedstoneActiveTicks() * 50L; // Convert ticks to ms
+                return ConfigManager.getRedstoneActiveTicks() * 50L;
             case CONTINUOUS:
-                return 300000L; // 5 minutes
+                return maxDurationContinuous;
             case COMPLEX:
-                return 600000L; // 10 minutes
+                return maxDurationComplex;
             case PULSE:
-                return 60000L;  // 1 minute
+                return maxDurationPulse;
             default:
-                return 180000L; // 3 minutes
+                return maxDurationDefault;
         }
     }
 
-    /**
-     * Gets the grace period before shutdown for a circuit type.
-     */
     private static long getGracePeriod(CircuitType type) {
         switch (type) {
             case CLOCK:
-                return 10000L; // 10 seconds
+                return gracePeriodClock;
             case CONTINUOUS:
-                return 30000L; // 30 seconds
+                return gracePeriodContinuous;
             case COMPLEX:
-                return 60000L; // 1 minute
+                return gracePeriodComplex;
             default:
-                return 20000L; // 20 seconds
+                return gracePeriodDefault;
         }
     }
 
@@ -390,15 +532,62 @@ public class RedstoneCircuitTracker {
     }
 
     /**
+     * Loads configuration from redstone.yml. Called on plugin startup and reload.
+     */
+    public static void loadConfig() {
+        java.io.File file = new java.io.File(
+                LagXpert.getInstance().getDataFolder(), "redstone.yml");
+        if (!file.exists()) return;
+
+        org.bukkit.configuration.file.FileConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+
+        String path = "circuit-tracker.";
+
+        // Detection
+        nearbyRepeaterRadius = config.getInt(path + "detection.nearby-repeater-radius", 3);
+        complexPatternRadiusXZ = config.getInt(path + "detection.complex-pattern-radius-xz", 2);
+        complexPatternRadiusY = config.getInt(path + "detection.complex-pattern-radius-y", 1);
+        complexPatternThreshold = config.getInt(path + "detection.complex-pattern-threshold", 5);
+
+        // Pulses
+        pulseMeasurementWindowMs = config.getLong(path + "pulses.measurement-window-ms", 10000);
+        maxPulsesPerWindow = config.getInt(path + "pulses.max-pulses-per-window", 200);
+
+        // Max durations
+        maxDurationContinuous = config.getLong(path + "max-duration.continuous-circuit", 300000);
+        maxDurationComplex = config.getLong(path + "max-duration.complex-circuit", 600000);
+        maxDurationPulse = config.getLong(path + "max-duration.pulse-circuit", 60000);
+        maxDurationDefault = config.getLong(path + "max-duration.unknown-circuit", 180000);
+
+        // Grace periods
+        gracePeriodClock = config.getLong(path + "grace-periods.clock-circuit", 10000);
+        gracePeriodContinuous = config.getLong(path + "grace-periods.continuous-circuit", 30000);
+        gracePeriodComplex = config.getLong(path + "grace-periods.complex-circuit", 60000);
+        gracePeriodDefault = config.getLong(path + "grace-periods.unknown-circuit", 20000);
+
+        // Shutdown
+        floodFillEnabled = config.getBoolean(path + "shutdown.flood-fill-enabled", true);
+        maxCircuitSize = config.getInt(path + "shutdown.max-circuit-size", 200);
+        maxBreaksPerShutdown = config.getInt(path + "shutdown.max-breaks-per-shutdown", 50);
+        escalateThreshold = config.getInt(path + "shutdown.escalate-threshold", 3);
+
+        // Cleanup
+        circuitTimeoutMs = config.getLong(path + "cleanup.inactivity-timeout-ms", 60000);
+        cleanupIntervalTicks = config.getLong(path + "cleanup.interval-ticks", 1200);
+    }
+
+    /**
      * Starts the cleanup task that removes inactive circuits.
      */
     public static void startCleanupTask() {
+        loadConfig(); // Load config before starting
         new BukkitRunnable() {
             @Override
             public void run() {
                 cleanupInactiveCircuits();
             }
-        }.runTaskTimer(LagXpert.getInstance(), CLEANUP_INTERVAL_TICKS, CLEANUP_INTERVAL_TICKS);
+        }.runTaskTimer(LagXpert.getInstance(), cleanupIntervalTicks, cleanupIntervalTicks);
     }
 
     /**
@@ -410,7 +599,7 @@ public class RedstoneCircuitTracker {
 
         activeCircuits.entrySet().removeIf(entry -> {
             RedstoneCircuit circuit = entry.getValue();
-            if (currentTime - circuit.getLastActivityTime() > CIRCUIT_TIMEOUT_MS) {
+            if (currentTime - circuit.getLastActivityTime() > circuitTimeoutMs) {
                 String locationKey = entry.getKey();
                 lastActivityTime.remove(locationKey);
                 pulseCounters.remove(locationKey);
