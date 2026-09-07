@@ -9,7 +9,7 @@
 # Configuration version (DO NOT MODIFY)
 config-version: "2.7"
 
-# 🧩 Modules Activation
+# Modules Activation
 # Activate or deactivate main plugin functionalities.
 # If a module is set to false, its specific listeners, tasks, and configurations
 # in other files (e.g., mobs.yml, redstone.yml, itemcleaner.yml)
@@ -84,14 +84,14 @@ modules:
   # Detailed settings are in 'emergency-controller.yml'.
   emergency-controller: true
 
-# 🧠 Debug Mode
+# Debug Mode
 # If true, LagXpert will output additional information to the server console,
 # which can be helpful for diagnosing issues or understanding plugin behavior.
 # It's recommended to keep this false during normal operation.
 # When enabled, shows detailed cache statistics, async processing info, and circuit tracking data.
 debug: false
 
-# 🚀 Performance Settings (Phase 1 Optimizations)
+# Performance Settings (Phase 1 Optimizations)
 # These settings control the new performance optimization features introduced in Phase 1.
 performance:
   # Cache system settings (applied globally)
@@ -137,13 +137,13 @@ performance:
 # Removed 'permissions.bypass-enabled' as it was not implemented.
 # Bypass functionality is handled by individual Bukkit permissions (e.g., lagxpert.bypass.mobs).
 
-# 📝 Action Logger Settings (v2.7+)
+# Action Logger Settings (v2.7+)
 # Records every corrective action the plugin takes for audit and diagnostics.
 action-logger:
   # Maximum entries in the circular buffer before oldest are dropped
   max-entries: 10000
 
-# 📊 Adaptive Thresholds (v2.7+)
+# Adaptive Thresholds (v2.7+)
 # Dynamically adjusts limits based on real-time server health.
 # When TPS drops or memory usage rises, limits are proportionally reduced;
 # when the server recovers, they return to the values configured elsewhere.
@@ -187,7 +187,7 @@ adaptive-thresholds:
     # Heap usage % at or above this = fully degraded
     degraded-memory-percent: 95.0
 
-# 📈 Performance History (v2.7+)
+# Performance History (v2.7+)
 # Collects periodic snapshots for trend analysis and peak prediction.
 # Data is persisted to performance-history.dat and survives restarts.
 performance-history:
@@ -203,7 +203,7 @@ performance-history:
   # default 5 minute interval.
   max-history-days: 7
 
-# 🌐 NEW v2.2: Platform Detection & Multi-Platform Support
+# NEW v2.2: Platform Detection & Multi-Platform Support
 # Automatically detects and optimizes for different server platforms
 platform-detection:
   # Enable automatic platform detection (Folia, Paper, Spigot, Bukkit)
@@ -224,7 +224,7 @@ platform-detection:
     # Optimize chunk operations for region-based processing
     optimize-chunk-operations: true
 
-# 🎮 NEW v2.2: Bedrock Edition Compatibility
+# NEW v2.2: Bedrock Edition Compatibility
 # Cross-platform support for Java and Bedrock players
 bedrock-compatibility:
   # Enable Bedrock player detection and optimization
@@ -258,7 +258,7 @@ bedrock-compatibility:
     # Automatically detect and integrate with available plugins
     auto-detect-plugins: true
 
-# 🤖 NEW v2.2: Smart Mob Management
+# NEW v2.2: Smart Mob Management
 # Intelligent mob removal system with comprehensive protection
 smart-mob-management:
   # Enable smart mob management system

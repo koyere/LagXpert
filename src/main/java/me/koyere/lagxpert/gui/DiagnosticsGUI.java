@@ -245,119 +245,136 @@ public class DiagnosticsGUI implements Listener {
         Layout layout = new Layout(size);
 
         // Server state
-        gui.setItem(layout.slot(0), item(
+        gui.setItem(SLOT_STATE, item(
                 stateMaterial(report.getServerState()),
-                stateColor(report.getServerState()) + "&lServer State: " + report.getServerState(),
-                Arrays.asList(
+                t("state.title", "{color}&lServer State: {state}",
+                        "color", stateColor(report.getServerState()),
+                        "state", report.getServerState()),
+                tList("state.lore", Arrays.asList(
                         "&7How LagXpert currently classifies",
                         "&7overall server health.",
                         "",
-                        "&7Emergency AI freeze: " +
-                                (EmergencyResponseCoordinator.getInstance().isAiCurrentlyFrozen()
-                                        ? "&cactive" : "&aoff"),
-                        "&7Blocking natural spawns: " +
-                                (EmergencyController.getInstance().shouldBlockNaturalSpawns()
-                                        ? "&cyes" : "&ano")
-                )));
+                        "&7Emergency AI freeze: {ai_freeze}",
+                        "&7Blocking natural spawns: {block_spawns}"),
+                        "ai_freeze", EmergencyResponseCoordinator.getInstance().isAiCurrentlyFrozen()
+                                ? "&cactive" : "&aoff",
+                        "block_spawns", EmergencyController.getInstance().shouldBlockNaturalSpawns()
+                                ? "&cyes" : "&ano")));
 
         // TPS
-        gui.setItem(layout.slot(1), item(
+        gui.setItem(SLOT_TPS, item(
                 Material.CLOCK,
-                tpsColor(report.getTps()) + "&lTPS: " + String.format("%.2f", report.getTps()),
-                Arrays.asList(
+                t("tps.title", "{color}&lTPS: {tps}",
+                        "color", tpsColor(report.getTps()),
+                        "tps", String.format("%.2f", report.getTps())),
+                tList("tps.lore", Arrays.asList(
                         "&7Ticks per second, target 20.00.",
                         "",
-                        "&71 min:  &f" + String.format("%.2f", TPSMonitor.getShortTermTPS()),
-                        "&75 min:  &f" + String.format("%.2f", TPSMonitor.getMediumTermTPS()),
-                        "&715 min: &f" + String.format("%.2f", TPSMonitor.getLongTermTPS()),
+                        "&71 min:  &f{tps_1m}",
+                        "&75 min:  &f{tps_5m}",
+                        "&715 min: &f{tps_15m}",
                         "",
-                        "&7Avg tick: &f" + String.format("%.1fms", TPSMonitor.getAverageTickTime())
-                )));
+                        "&7Avg tick: &f{avg_tick}"),
+                        "tps_1m", String.format("%.2f", TPSMonitor.getShortTermTPS()),
+                        "tps_5m", String.format("%.2f", TPSMonitor.getMediumTermTPS()),
+                        "tps_15m", String.format("%.2f", TPSMonitor.getLongTermTPS()),
+                        "avg_tick", String.format("%.1fms", TPSMonitor.getAverageTickTime()))));
 
         // Memory
-        gui.setItem(layout.slot(2), item(
+        gui.setItem(SLOT_MEMORY, item(
                 Material.IRON_BLOCK,
-                memColor(report.getMemoryPercent()) + "&lMemory: " +
-                        String.format("%.1f%%", report.getMemoryPercent()),
-                Arrays.asList(
+                t("memory.title", "{color}&lMemory: {percent}",
+                        "color", memColor(report.getMemoryPercent()),
+                        "percent", String.format("%.1f%%", report.getMemoryPercent())),
+                tList("memory.lore", Arrays.asList(
                         "&7Heap usage. Above 90% garbage",
-                        "&7collection pauses alone can cause lag.",
+                        "&7collection alone can cause lag.",
                         "",
-                        "&7Used: &f" + report.getUsedMemoryMb() + " MB",
-                        "&7Max:  &f" + report.getMaxMemoryMb() + " MB"
-                )));
+                        "&7Used: &f{used} MB",
+                        "&7Max:  &f{max} MB"),
+                        "used", report.getUsedMemoryMb(),
+                        "max", report.getMaxMemoryMb())));
 
         // Entities
-        gui.setItem(layout.slot(3), item(
+        gui.setItem(SLOT_ENTITIES, item(
                 Material.LEATHER,
-                "&e&lEntities: " + report.getTotalEntities(),
+                t("entities.title", "&e&lEntities: {count}",
+                        "count", report.getTotalEntities()),
                 buildEntityLore(report)));
 
         // Diagnosis: the plain-language conclusions
-        gui.setItem(layout.slot(4), item(
+        gui.setItem(SLOT_DIAGNOSIS, item(
                 Material.PAPER,
-                "&b&lDiagnosis",
+                t("diagnosis.title", "&b&lDiagnosis"),
                 buildObservationLore(report)));
-
-        // Hotspots entry
-        int hotspotCount = report.getRankedChunks().size();
-        gui.setItem(layout.slot(5), item(
-                hotspotCount > 0 ? Material.REDSTONE_TORCH : Material.LIME_TERRACOTTA,
-                (hotspotCount > 0 ? "&c&l" : "&a&l") + "Problem Chunks: " + hotspotCount,
-                Arrays.asList(
-                        "&7Chunks ranked by how much",
-                        "&7pressure they are creating.",
-                        "",
-                        hotspotCount > 0
-                                ? "&eClick to see exactly where they are"
-                                : "&7Nothing to investigate."
-                )));
 
         // Adaptive limits
         AdaptiveThresholdEngine adaptive = AdaptiveThresholdEngine.getInstance();
-        gui.setItem(layout.slot(6), item(
+        gui.setItem(SLOT_LIMITS, item(
                 Material.COMPARATOR,
-                (adaptive.isCurrentlyThrottling() ? "&e&l" : "&a&l") + "Active Limits",
-                Arrays.asList(
+                t("limits.title", "{color}&lActive Limits",
+                        "color", adaptive.isCurrentlyThrottling() ? "&e" : "&a"),
+                tList("limits.lore", Arrays.asList(
                         "&7Limits currently being enforced,",
                         "&7as a percentage of your config.",
                         "",
-                        "&7Health factor: &f" + String.format("%.2f", adaptive.getHealthFactor()),
-                        "&7Mobs:    &f" + percent(adaptive.getMobMultiplier()),
-                        "&7Storage: &f" + percent(adaptive.getStorageMultiplier()),
-                        "&7Entities:&f " + percent(adaptive.getEntityMultiplier()),
-                        "&7Redstone:&f " + percent(adaptive.getRedstoneMultiplier()),
-                        adaptive.isCurrentlyThrottling()
+                        "&7Health factor: &f{health}",
+                        "&7Mobs: &f{mobs} &8| &7Storage: &f{storage}",
+                        "&7Entities: &f{entities} &8| &7Redstone: &f{redstone}",
+                        "",
+                        "{summary}"),
+                        "health", String.format("%.2f", adaptive.getHealthFactor()),
+                        "mobs", percent(adaptive.getMobMultiplier()),
+                        "storage", percent(adaptive.getStorageMultiplier()),
+                        "entities", percent(adaptive.getEntityMultiplier()),
+                        "redstone", percent(adaptive.getRedstoneMultiplier()),
+                        "summary", adaptive.isCurrentlyThrottling()
                                 ? "&eLimits are being tightened right now."
-                                : "&aRunning at full configured limits."
-                )));
+                                : "&aRunning at full configured limits.")));
 
-        // Audit trail
-        gui.setItem(layout.slot(7), item(
+        // Hotspots entry (navigation)
+        int hotspotCount = report.getRankedChunks().size();
+        gui.setItem(SLOT_HOTSPOTS, item(
+                hotspotCount > 0 ? Material.REDSTONE_TORCH : Material.LIME_TERRACOTTA,
+                t("hotspots.title", "{color}&lProblem Chunks: {count}",
+                        "color", hotspotCount > 0 ? "&c" : "&a",
+                        "count", hotspotCount),
+                tList("hotspots.lore", Arrays.asList(
+                        "&7Chunks ranked by how much",
+                        "&7pressure they are creating.",
+                        "",
+                        "{hint}"),
+                        "hint", hotspotCount > 0
+                                ? t("hotspots.hint", "&eClick to see exactly where they are")
+                                : t("hotspots.none", "&7Nothing to investigate."))));
+
+        // Audit trail (navigation)
+        gui.setItem(SLOT_ACTIONS, item(
                 Material.BOOK,
-                "&6&lCorrective Actions",
-                Arrays.asList(
+                t("actions.title", "&6&lCorrective Actions"),
+                tList("actions.lore", Arrays.asList(
                         "&7What LagXpert has actually done,",
                         "&7with timestamps.",
                         "",
-                        "&7Logged total: &f" + ActionLogger.getInstance().getTotalActionsLogged(),
-                        "&7Last hour: &f" + countRecentInterventions(report),
+                        "&7Logged total: &f{total}",
+                        "&7Last hour: &f{recent}",
                         "",
-                        "&eClick to view the audit trail"
-                )));
+                        "&eClick to view the audit trail"),
+                        "total", ActionLogger.getInstance().getTotalActionsLogged(),
+                        "recent", countRecentInterventions(report))));
 
-        // Trends
-        gui.setItem(layout.slot(8), item(
+        // Trends (navigation)
+        gui.setItem(SLOT_TRENDS, item(
                 Material.MAP,
-                "&d&lHistory & Trends",
-                Arrays.asList(
+                t("trends.title", "&d&lHistory & Trends"),
+                tList("trends.lore", Arrays.asList(
                         "&7Long-term patterns: worst hour",
                         "&7of the day, peak players, growth.",
                         "",
-                        "&7Snapshots stored: &f" + PerformanceHistory.getInstance().getSnapshotCount(),
+                        "&7Snapshots stored: &f{snapshots}",
                         "",
-                        "&eClick to view trends"
-                )));
+                        "&eClick to view trends"),
+                        "snapshots", PerformanceHistory.getInstance().getSnapshotCount())));
 
         addFooter(gui, layout, player, report, false, false);
         addBorder(gui, layout);
@@ -724,38 +741,39 @@ public class DiagnosticsGUI implements Listener {
         if (state.screen == Screen.OVERVIEW) {
             gui.setItem(layout.footerSlot(0), item(
                     Material.BARRIER,
-                    "&cClose",
-                    Arrays.asList("&7Close this interface")));
+                    t("close.title", "&cClose"),
+                    tList("close.lore", Arrays.asList("&7Close this interface"))));
         } else {
             gui.setItem(layout.footerSlot(0), item(
                     Material.ARROW,
-                    "&eBack",
-                    Arrays.asList("&7Return to the previous screen")));
+                    t("back.title", "&eBack"),
+                    tList("back.lore", Arrays.asList("&7Return to the previous screen"))));
         }
 
         if (hasPrev) {
             gui.setItem(layout.footerSlot(3), item(
                     Material.ARROW,
-                    "&ePrevious Page",
-                    Arrays.asList("&7Show the previous page")));
+                    t("prev.title", "&ePrevious Page"),
+                    tList("prev.lore", Arrays.asList("&7Show the previous page"))));
         }
         if (hasNext) {
             gui.setItem(layout.footerSlot(5), item(
                     Material.ARROW,
-                    "&eNext Page",
-                    Arrays.asList("&7Show the next page")));
+                    t("next.title", "&eNext Page"),
+                    tList("next.lore", Arrays.asList("&7Show the next page"))));
         }
 
         // Rescan
-        List<String> refreshLore = new ArrayList<>();
-        refreshLore.add("&7Run a fresh scan of all loaded chunks.");
+        List<String> refreshLore = new ArrayList<>(tList("refresh.lore",
+                Arrays.asList("&7Run a fresh scan of all loaded chunks.")));
         if (report != null) {
             refreshLore.add("");
-            refreshLore.add("&7This data is &f" + formatAge(report.getAgeMs()) + " &7old.");
+            refreshLore.add(t("refresh.age", "&7This data is &f{age} &7old.",
+                    "age", formatAge(report.getAgeMs())));
         }
         gui.setItem(layout.footerSlot(8), item(
                 Material.SUNFLOWER,
-                "&aRefresh",
+                t("refresh.title", "&aRefresh"),
                 refreshLore));
     }
 
@@ -847,12 +865,12 @@ public class DiagnosticsGUI implements Listener {
         // Screen-specific content clicks
         switch (state.screen) {
             case OVERVIEW:
-                if (slot == layout.slot(5)) {
+                if (slot == SLOT_HOTSPOTS) {
                     state.page = 0;
                     renderHotspots(player, state);
-                } else if (slot == layout.slot(7)) {
+                } else if (slot == SLOT_ACTIONS) {
                     renderActions(player, state);
-                } else if (slot == layout.slot(8)) {
+                } else if (slot == SLOT_TRENDS) {
                     renderTrends(player, state);
                 }
                 break;
@@ -957,14 +975,38 @@ public class DiagnosticsGUI implements Listener {
      * Java clients get a full six rows.
      */
     private static int inventorySize(Player player) {
-        int size = BedrockPlayerUtils.isBedrockPlayer(player)
-                ? BedrockPlayerUtils.getSafeInventorySize(player)
-                : 54;
-        // Normalise to a legal chest size and keep at least three rows so a
-        // footer and one content row always fit.
-        size = Math.max(27, Math.min(54, (size / 9) * 9));
-        return size;
+        // Four rows for everyone: one border row, two content rows and a footer.
+        //
+        // Six rows was chosen initially because it is the maximum, but the screens
+        // only ever hold nine tiles, which left two and a half rows of filler glass
+        // and made the interface look unfinished. Four rows is also exactly the
+        // Bedrock-safe size, so Java and Bedrock now render an identical layout
+        // instead of two differently-proportioned ones.
+        int size = 36;
+
+        // Honor a stricter operator-configured Bedrock size if one is set.
+        if (BedrockPlayerUtils.isBedrockPlayer(player)) {
+            size = Math.min(size, BedrockPlayerUtils.getSafeInventorySize(player));
+        }
+        return Math.max(27, (size / 9) * 9);
     }
+
+    // ─── Overview slot map ──────────────────────────────────────────────
+    // Explicit constants rather than sequential positions, so the arrangement is
+    // deliberate and the click handler cannot drift out of step with the layout.
+
+    /** Row 1: read-only status tiles. */
+    private static final int SLOT_STATE = 10;
+    private static final int SLOT_TPS = 11;
+    private static final int SLOT_MEMORY = 12;
+    private static final int SLOT_ENTITIES = 13;
+    private static final int SLOT_LIMITS = 14;
+    private static final int SLOT_DIAGNOSIS = 15;
+
+    /** Row 2: navigation tiles, spaced so they read as buttons. */
+    private static final int SLOT_HOTSPOTS = 20;
+    private static final int SLOT_ACTIONS = 22;
+    private static final int SLOT_TRENDS = 24;
 
     /**
      * Opens the inventory, falling back to a chat report if that fails.
@@ -989,6 +1031,37 @@ public class DiagnosticsGUI implements Listener {
         }
     }
 
+    /**
+     * Resolves a translatable interface string.
+     *
+     * Every label in this interface goes through here so it can be overridden in
+     * messages.yml under {@code diagnostics.gui.*}. The English text stays in code
+     * as the fallback, which means the interface keeps working on installations
+     * whose messages.yml predates these keys.
+     */
+    private static String t(String key, String fallback, Object... placeholders) {
+        return MessageManager.getOrDefault("diagnostics.gui." + key, fallback, pairs(placeholders));
+    }
+
+    /**
+     * Resolves a translatable multi-line tooltip.
+     */
+    private static List<String> tList(String key, List<String> fallback, Object... placeholders) {
+        return MessageManager.getListOrDefault("diagnostics.gui." + key, fallback, pairs(placeholders));
+    }
+
+    /** Builds a placeholder map from alternating key/value arguments. */
+    private static Map<String, Object> pairs(Object... keyValuePairs) {
+        if (keyValuePairs == null || keyValuePairs.length == 0) {
+            return java.util.Collections.emptyMap();
+        }
+        Map<String, Object> map = new java.util.HashMap<>();
+        for (int i = 0; i + 1 < keyValuePairs.length; i += 2) {
+            map.put(String.valueOf(keyValuePairs[i]), keyValuePairs[i + 1]);
+        }
+        return map;
+    }
+
     private static ItemStack item(Material material, String name, List<String> lore) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
@@ -1011,41 +1084,83 @@ public class DiagnosticsGUI implements Listener {
         return stack;
     }
 
+    /**
+     * Builds the diagnosis tooltip.
+     *
+     * Shows the single most important observation in full rather than cramming
+     * several in and clipping the last one mid-sentence, which is what happened
+     * before. Remaining observations are advertised by count, with a pointer to
+     * the command that prints all of them.
+     */
     private static List<String> buildObservationLore(LagDiagnosticsEngine.DiagnosticsReport report) {
         List<String> lore = new ArrayList<>();
-        for (String observation : report.getObservations()) {
-            if (lore.size() >= MAX_LORE_LINES - 1) {
-                lore.add("&8...more in /lagxpert diagnose");
+        List<String> observations = report.getObservations();
+
+        if (observations.isEmpty()) {
+            lore.add("&7Nothing noteworthy detected.");
+            return lore;
+        }
+
+        // Reserve the last two lines for the "more" hint so the primary
+        // observation is never cut off part-way through a sentence.
+        int budget = MAX_LORE_LINES - 2;
+        List<String> wrapped = wrap(observations.get(0), 38);
+
+        for (String line : wrapped) {
+            if (lore.size() >= budget) {
+                lore.add("&8(truncated)");
                 break;
             }
-            for (String line : wrap(observation, 38)) {
-                if (lore.size() >= MAX_LORE_LINES - 1) {
-                    break;
-                }
-                lore.add("&f" + line);
-            }
-            lore.add("");
+            lore.add("&f" + line);
         }
-        if (lore.isEmpty()) {
-            lore.add("&7Nothing noteworthy detected.");
+
+        lore.add("");
+        if (observations.size() > 1) {
+            lore.add("&8+" + (observations.size() - 1) + " more - /lagxpert diagnose");
+        } else {
+            lore.add("&8Full report: /lagxpert diagnose");
         }
         return lore;
     }
 
+    /**
+     * Builds the entity tooltip, heaviest world first.
+     *
+     * Previously this iterated the map in world-registration order, so on a server
+     * with many worlds the visible rows were all empty ones and the world actually
+     * holding the entities was hidden behind the truncation marker.
+     */
     private static List<String> buildEntityLore(LagDiagnosticsEngine.DiagnosticsReport report) {
         List<String> lore = new ArrayList<>();
-        lore.add("&7Entity count per world.");
+        lore.add("&7Entity count per world, busiest first.");
         lore.add("");
+
+        List<Map.Entry<String, Integer>> worlds =
+                new ArrayList<>(report.getEntitiesByWorld().entrySet());
+        worlds.sort(Map.Entry.<String, Integer>comparingByValue().reversed());
+
         int shown = 0;
-        for (Map.Entry<String, Integer> entry : report.getEntitiesByWorld().entrySet()) {
-            if (shown >= 6) {
-                lore.add("&8...");
-                break;
+        int hidden = 0;
+        for (Map.Entry<String, Integer> entry : worlds) {
+            // Worlds with nothing in them are not worth a row.
+            if (entry.getValue() <= 0) {
+                hidden++;
+                continue;
+            }
+            if (shown >= 5) {
+                hidden++;
+                continue;
             }
             int chunks = report.getChunksByWorld().getOrDefault(entry.getKey(), 0);
             lore.add("&7" + entry.getKey() + ": &f" + entry.getValue() +
                     " &8(" + chunks + " chunks)");
             shown++;
+        }
+
+        if (shown == 0) {
+            lore.add("&7No entities in any loaded chunk.");
+        } else if (hidden > 0) {
+            lore.add("&8+" + hidden + " world(s) with none or fewer");
         }
         return lore;
     }

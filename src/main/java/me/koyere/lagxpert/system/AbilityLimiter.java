@@ -58,6 +58,11 @@ public class AbilityLimiter implements Listener {
     public void reloadConfig() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "abilities.yml");
         if (!file.exists()) {
+            // Never fail silently: a missing file used to leave this subsystem
+            // permanently disabled with no indication anywhere.
+            LagXpert.getInstance().getLogger().warning(
+                    "[AbilityLimiter] abilities.yml not found. This module will stay disabled. " +
+                            "Restart the server to regenerate it.");
             return;
         }
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);

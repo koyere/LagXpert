@@ -1,9 +1,9 @@
-# 🦅 Ability Limiter Configuration
+# Ability Limiter Configuration
 # Prevent abuse of game mechanics that can cause lag or imbalance.
 
 enabled: true
 
-# 🚀 Elytra Settings
+# Elytra Settings
 elytra:
   # Limit flight speed (blocks per tick multiplier)
   # High speeds generate too many chunks too fast
@@ -13,7 +13,7 @@ elytra:
   # 0.5 = slow to half speed, 0.0 = full stop
   slowdown-factor: 0.5
 
-# 🔱 Trident Settings
+# Trident Settings
 trident:
   # Cooldown between Riptide launches (milliseconds)
   riptide-cooldown: 2000
@@ -25,6 +25,6 @@ trident:
   # -0.5 = bounce back at half speed, 0.0 = full stop
   riptide-reversal-factor: -0.5
 
-# 🌍 World Settings
+# World Settings
 disabled-worlds:
   - "creative_world"

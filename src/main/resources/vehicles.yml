@@ -1,9 +1,9 @@
-# 🚗 Vehicle Manager Configuration
+# Vehicle Manager Configuration
 # Optimize and limit vehicles (boats, minecarts) to prevent lag.
 
 enabled: true
 
-# 📊 Limits
+# Limits
 # Maximum vehicles per chunk. Excess vehicles will be prevented on spawn.
 limits:
   minecarts:
@@ -12,7 +12,7 @@ limits:
   boats:
     per-chunk: 5
 
-# 🧹 Cleanup Settings
+# Cleanup Settings
 # Periodic cleanup of abandoned vehicles.
 cleanup:
   # Enable automatic removal of abandoned vehicles
@@ -34,7 +34,7 @@ cleanup:
   # Prevents removing vehicles that players might be actively using
   player-nearby-radius: 16
 
-# 🧪 Optimizations
+# Optimizations
 optimization:
   # If true, vehicles without passengers that are not moving will stop processing physics/collision
   disable-physics-for-empty: true
@@ -42,6 +42,6 @@ optimization:
   # Prevent collision checks for vehicles in full chunks
   reduce-collision-checks: true
 
-# 🌍 World Settings
+# World Settings
 disabled-worlds:
   - "creative_plot_world"

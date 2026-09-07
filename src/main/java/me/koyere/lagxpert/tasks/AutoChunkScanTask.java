@@ -210,6 +210,12 @@ public class AutoChunkScanTask extends BukkitRunnable {
                     placeholders.put("chunk_z", String.valueOf(currentChunk.getZ()));
                     placeholders.put("world", currentChunk.getWorld().getName());
                     placeholders.put("details", overloadedElementsSummary.toString());
+                    // Block coordinates of the chunk centre. Chunk coordinates alone are
+                    // not actionable: an admin standing "there" is usually in a
+                    // neighbouring chunk, which is why inspecting by hand reported
+                    // different numbers than the alert.
+                    placeholders.put("block_x", String.valueOf((currentChunk.getX() << 4) + 8));
+                    placeholders.put("block_z", String.valueOf((currentChunk.getZ() << 4) + 8));
 
                     String alertMessage = MessageManager.getPrefixedFormattedMessage("alerts.chunk-scan.overloaded-summary", placeholders);
 

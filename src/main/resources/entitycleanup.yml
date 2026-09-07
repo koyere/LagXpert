@@ -29,11 +29,15 @@ entity-cleanup:
   # Example for all worlds:
   # enabled-worlds:
   #   - "all"
+  # Default is "all". Listing specific world names instead means entity cleanup is
+  # SILENT in every world you do not list. LagXpert logs a summary on startup
+  # showing which worlds are covered and which are not, so a typo or a forgotten
+  # world is visible instead of silent.
   enabled-worlds:
-    - "world"
-    - "world_nether"
-    - "world_the_end"
-    # - "all" # Uncomment and remove specific worlds above to enable for all worlds.
+    - "all"
+    # - "world"
+    # - "world_nether"
+    # - "world_the_end"
 
   # Cleanup target configuration
   cleanup-targets:

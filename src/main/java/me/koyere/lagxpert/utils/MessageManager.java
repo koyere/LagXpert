@@ -72,14 +72,149 @@ public class MessageManager {
      * @return The formatted and color-translated message string.
      */
     public static String getFormatted(String path, Map<String, Object> replacements) {
-        String baseMessage = get(path); // get() already handles color translation, missing paths, and structured nodes
-        if (replacements == null || replacements.isEmpty()) {
-            return baseMessage;
+        // Substitution must happen BEFORE colour translation. Doing it the other way
+        // round means any '&' code contained in a replacement value is inserted after
+        // the translation pass and is rendered to the player literally, e.g. "&aNORMAL".
+        String rawMessage = getRaw(path);
+
+        if (replacements != null && !replacements.isEmpty()) {
+            for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                rawMessage = rawMessage.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+            }
         }
-        for (Map.Entry<String, Object> entry : replacements.entrySet()) {
-            baseMessage = baseMessage.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+
+        return ChatColor.translateAlternateColorCodes('&', rawMessage);
+    }
+
+    /**
+     * Resolves the ActionBar (short) variant of a message and substitutes
+     * placeholders before translating colour codes.
+     *
+     * Same ordering requirement as {@link #getFormatted}: substituting after
+     * translation would render any colour code inside a replacement literally.
+     */
+    private static String formatShort(String path, Map<String, Object> replacements) {
+        String raw = getRawShortMessage(path);
+        if (replacements != null) {
+            for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                raw = raw.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+            }
         }
-        return baseMessage;
+        return ChatColor.translateAlternateColorCodes('&', raw);
+    }
+
+    /**
+     * Returns the short variant of a message without colour translation,
+     * falling back to the full variant and then the raw value.
+     */
+    private static String getRawShortMessage(String path) {
+        if (messagesConfig == null) {
+            return "&cMessages not loaded: " + path;
+        }
+        if (messagesConfig.isConfigurationSection(path)) {
+            String shortValue = messagesConfig.getString(path + ".short", null);
+            if (shortValue != null) {
+                return shortValue;
+            }
+            return messagesConfig.getString(path + ".full", "&cMissing message: " + path + "&r");
+        }
+        String legacyShort = messagesConfig.getString(path + ".short", null);
+        if (legacyShort != null) {
+            return legacyShort;
+        }
+        return messagesConfig.getString(path, "&cMissing message: " + path + "&r");
+    }
+
+    /**
+     * Returns a message if it exists in messages.yml, otherwise the supplied
+     * default, with placeholders substituted and colours translated.
+     *
+     * Lets interface text be translatable without every key having to exist:
+     * an operator who has not regenerated messages.yml still sees sensible
+     * English rather than "Missing message: ...". Adding the key to messages.yml
+     * overrides it, and {@code /lagxpert reload} applies the change.
+     *
+     * @param path         key in messages.yml
+     * @param def          fallback used when the key is absent
+     * @param replacements optional placeholders, may be null
+     */
+    public static String getOrDefault(String path, String def, Map<String, Object> replacements) {
+        String raw = null;
+        if (messagesConfig != null) {
+            if (messagesConfig.isConfigurationSection(path)) {
+                raw = messagesConfig.getString(path + ".full", null);
+            } else {
+                raw = messagesConfig.getString(path, null);
+            }
+        }
+        if (raw == null) {
+            raw = def;
+        }
+        if (raw == null) {
+            return "";
+        }
+        if (replacements != null && !replacements.isEmpty()) {
+            for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                raw = raw.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+            }
+        }
+        return ChatColor.translateAlternateColorCodes('&', raw);
+    }
+
+    /**
+     * Returns a list of lines from messages.yml, or the supplied default list.
+     *
+     * Used for interface tooltips, where the number of lines is part of the
+     * translation rather than fixed by code.
+     */
+    public static java.util.List<String> getListOrDefault(String path,
+                                                          java.util.List<String> def,
+                                                          Map<String, Object> replacements) {
+        java.util.List<String> raw = null;
+        if (messagesConfig != null && messagesConfig.isList(path)) {
+            raw = messagesConfig.getStringList(path);
+            if (raw.isEmpty()) {
+                raw = null;
+            }
+        }
+        if (raw == null) {
+            raw = def;
+        }
+        if (raw == null) {
+            return java.util.Collections.emptyList();
+        }
+
+        java.util.List<String> out = new java.util.ArrayList<>(raw.size());
+        for (String line : raw) {
+            String value = line == null ? "" : line;
+            if (replacements != null && !replacements.isEmpty()) {
+                for (Map.Entry<String, Object> entry : replacements.entrySet()) {
+                    value = value.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+                }
+            }
+            out.add(ChatColor.translateAlternateColorCodes('&', value));
+        }
+        return out;
+    }
+
+    /**
+     * Returns a message exactly as written in messages.yml, without translating
+     * colour codes.
+     *
+     * Used by {@link #getFormatted} so that placeholder values may themselves
+     * contain colour codes and still be translated.
+     *
+     * @param path The path to the message string in messages.yml.
+     * @return The untranslated message, or a "missing message" indicator.
+     */
+    public static String getRaw(String path) {
+        if (messagesConfig == null) {
+            return "&c[LagXpert Error] Messages not loaded! Path: " + path;
+        }
+        if (messagesConfig.isConfigurationSection(path)) {
+            return messagesConfig.getString(path + ".full", "&cMissing message: " + path + "&r");
+        }
+        return messagesConfig.getString(path, "&cMissing message: " + path + "&r");
     }
 
     /**
@@ -277,23 +412,11 @@ public class MessageManager {
 
         switch (messageType) {
             case ACTIONBAR:
-                String shortMsg = getShortMessage(path);
-                if (replacements != null) {
-                    for (Map.Entry<String, Object> entry : replacements.entrySet()) {
-                        shortMsg = shortMsg.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
-                    }
-                }
-                sendMessage(player, getPrefix() + shortMsg, MessageType.ACTIONBAR);
+                sendMessage(player, getPrefix() + formatShort(path, replacements), MessageType.ACTIONBAR);
                 break;
             case BOTH:
                 sendPrefixedFormattedMessage(player, path, replacements, MessageType.CHAT);
-                String shortMsgBoth = getShortMessage(path);
-                if (replacements != null) {
-                    for (Map.Entry<String, Object> entry : replacements.entrySet()) {
-                        shortMsgBoth = shortMsgBoth.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
-                    }
-                }
-                sendMessage(player, getPrefix() + shortMsgBoth, MessageType.ACTIONBAR);
+                sendMessage(player, getPrefix() + formatShort(path, replacements), MessageType.ACTIONBAR);
                 break;
             default:
                 sendPrefixedFormattedMessage(player, path, replacements, MessageType.CHAT);

@@ -1,9 +1,9 @@
-# 🚫 Console Filter Configuration
+# Console Filter Configuration
 # Hide unwanted spam messages from your server console.
 
 enabled: true
 
-# 📋 Filters
+# Filters
 # List of Regex patterns to hide.
 # Be careful! Hiding critical errors or important info can make debugging hard.
 filters:
@@ -16,7 +16,7 @@ filters:
   # Example: Hide specific plugin spam
   # - ".*\[SomeSpammyPlugin\].*"
 
-# 📡 Forwarding
+# Forwarding
 # Forward filtered messages to admins via in-game chat instead of console?
 forward-to-admins: false
 forward-permission: "lagxpert.console.view-filtered"

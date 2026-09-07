@@ -45,6 +45,11 @@ public class ConsoleFilter implements Filter {
     public void reloadConfig() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "console-filter.yml");
         if (!file.exists()) {
+            // Never fail silently: a missing file used to leave this subsystem
+            // permanently disabled with no indication anywhere.
+            LagXpert.getInstance().getLogger().warning(
+                    "[ConsoleFilter] console-filter.yml not found. This module will stay disabled. " +
+                            "Restart the server to regenerate it.");
             return;
         }
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);

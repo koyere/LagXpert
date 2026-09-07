@@ -1,12 +1,12 @@
 # LagXpert v2.2 - Mob Management Configuration
 
-# 🧟 Maximum number of living entities (e.g., mobs, animals) allowed per chunk
+# Maximum number of living entities (e.g., mobs, animals) allowed per chunk
 # If the number exceeds this value, spawning is blocked and players are notified (if enabled).
 # In v2.2, excess mobs are also automatically removed using smart management.
 limits:
   mobs-per-chunk: 40
 
-# 🤖 NEW v2.2: Smart Mob Management System
+# NEW v2.2: Smart Mob Management System
 # Automatically removes excess mobs while protecting important entities
 smart-management:
   # Enable automatic removal of excess mobs
@@ -68,7 +68,7 @@ smart-management:
     # - "world_nether"
     # - "world_the_end"
 
-# 🧠 NEW v2.6: Mob AI Optimizer
+# NEW v2.6: Mob AI Optimizer
 # Reduces server strain by disabling AI on specific mobs or in specific conditions
 ai-optimizer:
   enabled: true

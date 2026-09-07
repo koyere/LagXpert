@@ -1,4 +1,4 @@
-# 💥 Explosion Controller Configuration
+# Explosion Controller Configuration
 # Manage and optimize explosions to prevent server crashes and lag.
 
 enabled: true
@@ -17,7 +17,7 @@ settings:
   # 0.3 = 30% of blocks will drop items
   drop-chance: 0.3
 
-# 📏 Blast Radius Clamping
+# Blast Radius Clamping
 # Limit the maximum power of explosions to prevent massive terrain damage calculation
 radius-limits:
   tnt: 4.0        # Default Minecraft is 4.0
@@ -27,7 +27,7 @@ radius-limits:
   wither: 7.0     # Wither spawn/death default is 7.0
   other: 4.0      # Any other explosion source
 
-# 🌍 World Settings
+# World Settings
 # Disable explosion control in these worlds
 disabled-worlds:
   - "creative_world"

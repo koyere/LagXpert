@@ -57,6 +57,11 @@ public class VehicleManager implements Listener {
     public void reloadConfig() {
         File file = new File(LagXpert.getInstance().getDataFolder(), "vehicles.yml");
         if (!file.exists()) {
+            // Never fail silently: a missing file used to leave this subsystem
+            // permanently disabled with no indication anywhere.
+            LagXpert.getInstance().getLogger().warning(
+                    "[VehicleManager] vehicles.yml not found. This module will stay disabled. " +
+                            "Restart the server to regenerate it.");
             this.enabled = false;
             return;
         }

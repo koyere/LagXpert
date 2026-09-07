@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────
-#  🔷 LagXpert Free - Customizable Messages File
+#  LagXpert Free - Customizable Messages File
 # ──────────────────────────────────────────────
 # Here you can translate and customize all messages LagXpert shows to users.
 # - Use '&' for color codes (e.g., &a for light green, &c for light red).
@@ -70,6 +70,125 @@ diagnostics:
   world-unavailable: "&cThat world is no longer loaded."
   teleported: "&aTeleported to &f{world} &7at &f{x}, {y}, {z}&a."
   no-report: "&7No diagnostics data yet. Run &e/lagxpert diagnose &7first."
+
+  # == Diagnostics GUI ==
+  # Every label in the diagnostics interface can be translated here.
+  # Any key you delete falls back to the built-in English text, so you can
+  # translate as much or as little as you want. /lagxpert reload applies changes.
+  #
+  # 'lore' keys are LISTS: add or remove lines freely, an empty string "" is a
+  # blank separator line. Keep lists at 10 lines or fewer, because Bedrock
+  # clients truncate longer tooltips.
+  gui:
+    # {color} is set automatically from the value, {state} is NORMAL/WARNING/...
+    state:
+      title: "{color}&lServer State: {state}"
+      lore:
+        - "&7How LagXpert currently classifies"
+        - "&7overall server health."
+        - ""
+        - "&7Emergency AI freeze: {ai_freeze}"
+        - "&7Blocking natural spawns: {block_spawns}"
+
+    # {tps} current, {tps_1m} {tps_5m} {tps_15m} averages, {avg_tick} ms
+    tps:
+      title: "{color}&lTPS: {tps}"
+      lore:
+        - "&7Ticks per second, target 20.00."
+        - ""
+        - "&71 min:  &f{tps_1m}"
+        - "&75 min:  &f{tps_5m}"
+        - "&715 min: &f{tps_15m}"
+        - ""
+        - "&7Avg tick: &f{avg_tick}"
+
+    # {percent} heap used, {used} and {max} in MB
+    memory:
+      title: "{color}&lMemory: {percent}"
+      lore:
+        - "&7Heap usage. Above 90% garbage"
+        - "&7collection alone can cause lag."
+        - ""
+        - "&7Used: &f{used} MB"
+        - "&7Max:  &f{max} MB"
+
+    # {count} total entities. The per-world breakdown is generated automatically.
+    entities:
+      title: "&e&lEntities: {count}"
+
+    diagnosis:
+      title: "&b&lDiagnosis"
+
+    # {health} factor, {mobs} {storage} {entities} {redstone} percentages
+    limits:
+      title: "{color}&lActive Limits"
+      lore:
+        - "&7Limits currently being enforced,"
+        - "&7as a percentage of your config."
+        - ""
+        - "&7Health factor: &f{health}"
+        - "&7Mobs: &f{mobs} &8| &7Storage: &f{storage}"
+        - "&7Entities: &f{entities} &8| &7Redstone: &f{redstone}"
+        - ""
+        - "{summary}"
+
+    # {count} problem chunks, {hint} resolves to 'hint' or 'none' below
+    hotspots:
+      title: "{color}&lProblem Chunks: {count}"
+      hint: "&eClick to see exactly where they are"
+      none: "&7Nothing to investigate."
+      lore:
+        - "&7Chunks ranked by how much"
+        - "&7pressure they are creating."
+        - ""
+        - "{hint}"
+
+    # {total} actions ever logged, {recent} in the last hour
+    actions:
+      title: "&6&lCorrective Actions"
+      lore:
+        - "&7What LagXpert has actually done,"
+        - "&7with timestamps."
+        - ""
+        - "&7Logged total: &f{total}"
+        - "&7Last hour: &f{recent}"
+        - ""
+        - "&eClick to view the audit trail"
+
+    # {snapshots} stored history snapshots
+    trends:
+      title: "&d&lHistory & Trends"
+      lore:
+        - "&7Long-term patterns: worst hour"
+        - "&7of the day, peak players, growth."
+        - ""
+        - "&7Snapshots stored: &f{snapshots}"
+        - ""
+        - "&eClick to view trends"
+
+    # Navigation buttons
+    back:
+      title: "&eBack"
+      lore:
+        - "&7Return to the previous screen"
+    close:
+      title: "&cClose"
+      lore:
+        - "&7Close this interface"
+    prev:
+      title: "&ePrevious Page"
+      lore:
+        - "&7Show the previous page"
+    next:
+      title: "&eNext Page"
+      lore:
+        - "&7Show the next page"
+    refresh:
+      title: "&aRefresh"
+      # {age} how old the current data is
+      age: "&7This data is &f{age} &7old."
+      lore:
+        - "&7Run a fresh scan of all loaded chunks."
 
 # == /lagxpert status Dashboard ==
 # All lines are customizable. Available placeholders are listed per key.
@@ -202,7 +321,11 @@ limits:
 # == AutoChunkScanTask Messages ==
 alerts:
   chunk-scan:
-    overloaded-summary: "&cChunk [{chunk_x},{chunk_z}] in world '{world}' is overloaded: &e{details}"
+    # Placeholders: {chunk_x} {chunk_z} {world} {details} {block_x} {block_z}
+    # {block_x}/{block_z} are the block coordinates at the centre of the chunk.
+    # Use those to travel there: chunk coordinates are not block coordinates, so
+    # standing at "chunk -4022, -1487" is not the same as being in that chunk.
+    overloaded-summary: "&cChunk [{chunk_x},{chunk_z}] in '{world}' is overloaded: &e{details} &7(go to &f{block_x}, {block_z}&7 - inspect with &f/lagxpert inspect {chunk_x} {chunk_z} {world}&7)"
 
   # == Performance Monitoring Alert Messages ==
   messages:

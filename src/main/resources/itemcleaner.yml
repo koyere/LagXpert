@@ -32,11 +32,16 @@ item-cleaner:
   # Example for all worlds:
   # enabled-worlds:
   #   - "all"
+  # Default is "all". Listing specific world names instead means the cleaner is
+  # SILENT in every world you do not list: no items are cleared there and the
+  # warning message is not sent to players standing there. If you list worlds,
+  # LagXpert logs a summary on startup showing which worlds are covered and which
+  # are not, so a typo or a forgotten world is visible instead of silent.
   enabled-worlds:
-    - "world"
-    - "world_nether"
-    - "world_the_end"
-    # - "all" # Uncomment and remove specific worlds above to enable for all worlds.
+    - "all"
+    # - "world"
+    # - "world_nether"
+    # - "world_the_end"
 
   # List of item material names (from Bukkit's Material enum, e.g., DIAMOND_SWORD)
   # that should be EXCLUDED from automatic removal. These items will be ignored by the cleaner.

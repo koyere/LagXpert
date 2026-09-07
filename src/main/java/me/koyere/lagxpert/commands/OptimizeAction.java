@@ -22,6 +22,9 @@ import java.util.Map;
  */
 public class OptimizeAction {
 
+    /** Name of the cache phase, which is housekeeping rather than a removal. */
+    private static final String CACHE_PHASE = "Cache Clear";
+
     /**
      * Result container for a single optimization phase.
      */
@@ -120,17 +123,29 @@ public class OptimizeAction {
         // Display results
         sender.sendMessage("");
         sender.sendMessage(MessageManager.color("&e&lResults:"));
+
+        // Only phases that actually removed something from the world count as
+        // corrective actions. Clearing an internal cache is housekeeping, not
+        // optimization: counting its entries used to inflate the total to numbers
+        // like "141 actions" on a server where nothing was removed at all.
         int totalActions = 0;
-        for (PhaseResult pr : results.values()) {
+        for (Map.Entry<String, PhaseResult> entry : results.entrySet()) {
+            PhaseResult pr = entry.getValue();
+            boolean counts = !CACHE_PHASE.equals(pr.name);
+
             if (pr.count > 0) {
                 sender.sendMessage(MessageManager.color(
-                        "  &7• &f" + pr.name + ": &a" + pr.count +
+                        "  &7\u2022 &f" + pr.name + ": &a" + pr.count +
+                                (counts ? "" : " &8(cache entries, not removals)") +
                                 " &7(" + pr.durationMs + "ms)"));
             } else {
                 sender.sendMessage(MessageManager.color(
-                        "  &7• &f" + pr.name + ": &7none needed"));
+                        "  &7\u2022 &f" + pr.name + ": &7nothing to remove"));
             }
-            totalActions += pr.count;
+
+            if (counts) {
+                totalActions += pr.count;
+            }
         }
 
         sender.sendMessage("");
@@ -146,25 +161,28 @@ public class OptimizeAction {
                 "  &7Entities: &f" + entitiesBefore + " &7\u2192 " +
                         deltaColor(entitiesAfter, entitiesBefore, true) + entitiesAfter +
                         " &8(" + signed(entitiesAfter - entitiesBefore) + ")"));
+        // Heap usage is reported neutrally, not as success or failure. Removing
+        // objects makes them garbage but does not collect them, so used memory
+        // routinely rises during a pass and only drops at the next GC. Colouring
+        // that red made a normal outcome look like a regression.
         sender.sendMessage(MessageManager.color(
-                "  &7Memory: &f" + (memBefore / 1024 / 1024) + "MB &7\u2192 " +
-                        deltaColor(memAfter, memBefore, true) + (memAfter / 1024 / 1024) + "MB"));
+                "  &7Memory: &f" + (memBefore / 1024 / 1024) + "MB &7\u2192 &f" +
+                        (memAfter / 1024 / 1024) + "MB &8(drops at next GC, not instantly)"));
 
         // TPS is a rolling average, so it cannot move within the span of this
         // command. Saying so is more useful than showing a meaningless delta.
         sender.sendMessage(MessageManager.color(String.format(
-                "  &7TPS: &f%.2f &8(rolling average, allow a minute to reflect changes)", tpsBefore)));
+                "  &7TPS: &f%.2f &8(rolling average, allow a minute)", tpsBefore)));
 
         sender.sendMessage("");
         if (totalActions > 0) {
             sender.sendMessage(MessageManager.color(
-                    "&aOptimization complete. &7Total actions: &e" + totalActions +
-                            " &7in &e" + totalDuration + "ms"));
+                    "&aOptimization complete. &7Removed &e" + totalActions +
+                            " &7object(s) in &e" + totalDuration + "ms"));
         } else {
             sender.sendMessage(MessageManager.color(
-                    "&7Optimization complete, but nothing needed doing. &8(" + totalDuration + "ms)"));
-            sender.sendMessage(MessageManager.color(
-                    "&7If the server still feels slow, run &e/lagxpert diagnose &7to find the cause."));
+                    "&7Optimization complete. &fThere was nothing removable. &8(" + totalDuration + "ms)"));
+            explainWhyNothingWasRemoved(sender);
         }
 
         // Log to audit trail
@@ -269,6 +287,86 @@ public class OptimizeAction {
         }
 
         return new PhaseResult("Cache Clear", cleared, duration);
+    }
+
+    /**
+     * Explains why an optimization pass removed nothing.
+     *
+     * "Nothing needed doing" is misleading when {@code /lagxpert diagnose} is
+     * simultaneously reporting problem chunks. The distinction is that optimize
+     * only removes things the plugin owns the right to remove: excess mobs, broken
+     * or abandoned entities, ground items, and inactive chunks. It deliberately
+     * never deletes player-placed blocks, so a chunk that is over its furnace or
+     * hopper limit cannot be "optimized" away — it needs either a stricter limit
+     * or a human decision.
+     *
+     * Rather than leaving the operator to work that out, this reads the last
+     * diagnostics report and says what the outstanding problems actually are.
+     */
+    private static void explainWhyNothingWasRemoved(CommandSender sender) {
+        LagDiagnosticsEngine.DiagnosticsReport report =
+                LagDiagnosticsEngine.getInstance().getLastReport();
+
+        if (report == null || report.getRankedChunks().isEmpty()) {
+            sender.sendMessage(MessageManager.color(
+                    "&7Nothing was over its limits, so there was nothing to clean up."));
+            sender.sendMessage(MessageManager.color(
+                    "&7If the server still feels slow, run &e/lagxpert diagnose&7."));
+            return;
+        }
+
+        // Tally which metrics are over limit across the report.
+        Map<String, Integer> blockViolations = new LinkedHashMap<>();
+        int chunksWithViolations = 0;
+
+        for (LagDiagnosticsEngine.ChunkDiagnostic chunk : report.getRankedChunks()) {
+            java.util.List<LagDiagnosticsEngine.MetricFinding> violations = chunk.getViolations();
+            if (!violations.isEmpty()) {
+                chunksWithViolations++;
+            }
+            for (LagDiagnosticsEngine.MetricFinding violation : violations) {
+                // Mobs and loose entities are removable; blocks are not.
+                if (!violation.getMetric().equals("mobs") && !violation.getMetric().equals("entities")) {
+                    blockViolations.merge(violation.getMetric(), 1, Integer::sum);
+                }
+            }
+        }
+
+        if (blockViolations.isEmpty()) {
+            sender.sendMessage(MessageManager.color(
+                    "&7Everything removable was already within limits."));
+            sender.sendMessage(MessageManager.color(
+                    "&7Run &e/lagxpert diagnose &7for the full picture."));
+            return;
+        }
+
+        sender.sendMessage(MessageManager.color(
+                "&e&lWhy nothing was removed:"));
+        sender.sendMessage(MessageManager.color(
+                "&7Optimize only removes excess mobs, broken entities, ground items"));
+        sender.sendMessage(MessageManager.color(
+                "&7and inactive chunks. It never deletes player-placed blocks."));
+        sender.sendMessage("");
+        sender.sendMessage(MessageManager.color(
+                "&7Your outstanding problems are block-based, in &f" +
+                        chunksWithViolations + " &7chunk(s):"));
+
+        int shown = 0;
+        for (Map.Entry<String, Integer> entry : blockViolations.entrySet()) {
+            if (shown >= 5) {
+                break;
+            }
+            sender.sendMessage(MessageManager.color(
+                    "  &7\u2022 &c" + entry.getKey() + " &7over limit in &f" +
+                            entry.getValue() + " &7chunk(s)"));
+            shown++;
+        }
+
+        sender.sendMessage("");
+        sender.sendMessage(MessageManager.color(
+                "&7Fix those by lowering the limit (&e/lagxpert profile aggressive&7),"));
+        sender.sendMessage(MessageManager.color(
+                "&7or find and deal with the builds: &e/lagxpert diagnose"));
     }
 
     /**

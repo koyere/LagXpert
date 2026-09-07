@@ -409,10 +409,11 @@ public class ConfigManager {
         // FIXED: Proper loading of enabled worlds list
         itemCleanerEnabledWorlds = itemCleanerConfig.getStringList("item-cleaner.enabled-worlds");
         if (itemCleanerEnabledWorlds == null || itemCleanerEnabledWorlds.isEmpty()) {
+            // Falls back to every world rather than the three vanilla names. Naming
+            // them meant the cleaner silently skipped every custom world, and the
+            // warning message never reached players standing in one.
             itemCleanerEnabledWorlds = new ArrayList<>();
-            itemCleanerEnabledWorlds.add("world");
-            itemCleanerEnabledWorlds.add("world_nether");
-            itemCleanerEnabledWorlds.add("world_the_end");
+            itemCleanerEnabledWorlds.add("all");
         }
 
         // FIXED: Proper loading of excluded items list
@@ -470,10 +471,10 @@ public class ConfigManager {
         // FIXED: Proper loading of enabled worlds list for entity cleanup
         entityCleanupEnabledWorlds = entityCleanupConfig.getStringList("entity-cleanup.enabled-worlds");
         if (entityCleanupEnabledWorlds == null || entityCleanupEnabledWorlds.isEmpty()) {
+            // Falls back to every world rather than the three vanilla names, which
+            // silently excluded every custom world on the server.
             entityCleanupEnabledWorlds = new ArrayList<>();
-            entityCleanupEnabledWorlds.add("world");
-            entityCleanupEnabledWorlds.add("world_nether");
-            entityCleanupEnabledWorlds.add("world_the_end");
+            entityCleanupEnabledWorlds.add("all");
         }
 
         cleanupInvalidEntities = entityCleanupConfig.getBoolean("entity-cleanup.cleanup-targets.invalid-entities", true);
@@ -696,6 +697,8 @@ public class ConfigManager {
 
         // === INITIALIZE PER-WORLD CONFIGURATION SYSTEM ===
         WorldConfigManager.initialize();
+
+        reportWorldCoverage();
 
         // Validate critical configurations
         validateConfigurations();
@@ -1196,6 +1199,97 @@ public class ConfigManager {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Logs which worlds the world-scoped cleanup modules actually cover.
+     *
+     * A per-module {@code enabled-worlds} list that omits a world makes that module
+     * completely silent there: nothing is cleaned and no message is delivered to
+     * players standing in it. That silence is indistinguishable from a bug, and it
+     * is what made a translated item-cleaner warning appear not to work at all.
+     *
+     * Two problems are reported:
+     * <ul>
+     *   <li>a configured world that does not exist, which is almost always a typo</li>
+     *   <li>an existing world that no list covers, which is usually an oversight</li>
+     * </ul>
+     */
+    private static void reportWorldCoverage() {
+        try {
+            List<String> serverWorlds = new ArrayList<>();
+            for (World world : org.bukkit.Bukkit.getWorlds()) {
+                serverWorlds.add(world.getName());
+            }
+            if (serverWorlds.isEmpty()) {
+                return; // Called before worlds are loaded; nothing to verify yet.
+            }
+
+            checkWorldList("item-cleaner", itemCleanerEnabledWorlds, serverWorlds);
+            checkWorldList("entity-cleanup", entityCleanupEnabledWorlds, serverWorlds);
+        } catch (Exception e) {
+            // Diagnostics only; never allow this to interfere with config loading.
+            if (debugEnabled) {
+                LagXpert.getInstance().getLogger().warning(
+                        "[ConfigManager] World coverage check failed: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Compares one module's world list against the worlds that actually exist.
+     */
+    private static void checkWorldList(String moduleName, List<String> configured, List<String> serverWorlds) {
+        if (configured == null || configured.isEmpty()) {
+            return;
+        }
+
+        // "all" covers everything; nothing can be missed.
+        for (String entry : configured) {
+            if (entry != null && entry.equalsIgnoreCase("all")) {
+                return;
+            }
+        }
+
+        List<String> unknown = new ArrayList<>();
+        for (String entry : configured) {
+            boolean exists = false;
+            for (String world : serverWorlds) {
+                if (world.equalsIgnoreCase(entry)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                unknown.add(entry);
+            }
+        }
+
+        List<String> uncovered = new ArrayList<>();
+        for (String world : serverWorlds) {
+            boolean covered = false;
+            for (String entry : configured) {
+                if (world.equalsIgnoreCase(entry)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                uncovered.add(world);
+            }
+        }
+
+        if (!unknown.isEmpty()) {
+            LagXpert.getInstance().getLogger().warning(
+                    "[ConfigManager] " + moduleName + ".enabled-worlds lists world(s) that do not exist: " +
+                            unknown + ". Check for typos.");
+        }
+        if (!uncovered.isEmpty()) {
+            LagXpert.getInstance().getLogger().warning(
+                    "[ConfigManager] " + moduleName + " will NOT run in: " + uncovered +
+                            ". Players there receive no messages from this module. " +
+                            "Add the world name, or use \"all\", in its enabled-worlds list.");
+        }
     }
 
     /**

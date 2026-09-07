@@ -63,6 +63,14 @@ public class LagXpert extends JavaPlugin {
     private me.koyere.lagxpert.system.VehicleManager vehicleManager;
     private me.koyere.lagxpert.system.AbilityLimiter abilityLimiter;
 
+    // Interval-driven repeating tasks. Held so that /lagxpert reload can cancel and
+    // reschedule them: without this, changing an interval in a config file had no
+    // effect until the server restarted, and each reload stacked another timer.
+    private AutoChunkScanTask autoChunkScanTask;
+    private ItemCleanerTask itemCleanerTask;
+    private EntityCleanupTask entityCleanupTask;
+    private ChunkActivityCleanupTask chunkActivityCleanupTask;
+
     /**
      * Returns the static instance of this plugin.
      * Provides a global access point to the plugin instance.
@@ -184,7 +192,16 @@ public class LagXpert extends JavaPlugin {
                 "monitoring.yml", // Phase 2 monitoring config
                 "chunks.yml", // Phase 2 chunk management config
                 "emergency-controller.yml", // Emergency Controller state machine config
-                "profiles.yml" // Optimization profiles
+                "profiles.yml", // Optimization profiles
+
+                // These four were shipped inside the JAR but never written to disk.
+                // Their subsystems all bail out when their file is absent, which meant
+                // explosion control, vehicle limits, ability limits and the console
+                // filter were silently disabled and unconfigurable on every install.
+                "explosions.yml", // Explosion radius and chain-reaction control
+                "vehicles.yml", // Vehicle limits and abandoned vehicle cleanup
+                "abilities.yml", // Elytra speed and riptide cooldown
+                "console-filter.yml" // Console log regex filters
         };
 
         // Only save files that don't exist to prevent warnings
@@ -549,10 +566,17 @@ public class LagXpert extends JavaPlugin {
      * Enhanced with Phase 1 & 2 tasks.
      */
     private void schedulePluginTasks() {
+        // Cancel any previously scheduled instances first. Without this, a reload
+        // would leave the old timers running alongside the new ones: changing an
+        // interval appeared to do nothing because the original task kept firing at
+        // its startup interval, and repeated reloads stacked duplicate tasks.
+        cancelIntervalTasks();
+
         // Schedule automatic chunk scanning task
         if (ConfigManager.isAutoChunkScanModuleEnabled()) {
             long scanInterval = ConfigManager.getScanIntervalTicks();
-            new AutoChunkScanTask().runTaskTimer(this, 100L, scanInterval);
+            autoChunkScanTask = new AutoChunkScanTask();
+            autoChunkScanTask.runTaskTimer(this, 100L, scanInterval);
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] AutoChunkScanTask scheduled with interval: " + scanInterval + " ticks");
@@ -563,7 +587,8 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isItemCleanerModuleEnabled()) {
             int cleanerInterval = ConfigManager.getItemCleanerIntervalTicks();
             long initialDelay = ConfigManager.getItemCleanerInitialDelayTicks();
-            new ItemCleanerTask().runTaskTimer(this, initialDelay, cleanerInterval);
+            itemCleanerTask = new ItemCleanerTask();
+            itemCleanerTask.runTaskTimer(this, initialDelay, cleanerInterval);
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] ItemCleanerTask scheduled with interval: " + cleanerInterval + " ticks");
@@ -574,7 +599,8 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isEntityCleanupModuleEnabled()) {
             int entityCleanupInterval = ConfigManager.getEntityCleanupIntervalTicks();
             long entityCleanupInitialDelay = ConfigManager.getEntityCleanupInitialDelayTicks();
-            new EntityCleanupTask().runTaskTimer(this, entityCleanupInitialDelay, entityCleanupInterval);
+            entityCleanupTask = new EntityCleanupTask();
+            entityCleanupTask.runTaskTimer(this, entityCleanupInitialDelay, entityCleanupInterval);
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info(
@@ -585,13 +611,49 @@ public class LagXpert extends JavaPlugin {
         if (ConfigManager.isChunkManagementModuleEnabled() && ConfigManager.isChunkActivityTrackingEnabled()) {
             int cleanupInterval = ConfigManager.getActivityCleanupIntervalTicks();
             if (cleanupInterval > 0) {
-                new ChunkActivityCleanupTask().runTaskTimer(this, cleanupInterval, cleanupInterval);
+                chunkActivityCleanupTask = new ChunkActivityCleanupTask();
+                chunkActivityCleanupTask.runTaskTimer(this, cleanupInterval, cleanupInterval);
 
                 if (ConfigManager.isDebugEnabled()) {
                     getLogger().info("[LagXpert] ChunkActivityCleanupTask scheduled with interval: " + cleanupInterval
                             + " ticks");
                 }
             }
+        }
+    }
+
+    /**
+     * Cancels the interval-driven repeating tasks so they can be rescheduled with
+     * freshly loaded intervals.
+     *
+     * Only the tasks owned by {@link #schedulePluginTasks()} are touched. Monitoring,
+     * chunk management and the smart scheduler manage their own lifecycles and are
+     * deliberately left alone.
+     */
+    private void cancelIntervalTasks() {
+        cancelIfRunning(autoChunkScanTask);
+        cancelIfRunning(itemCleanerTask);
+        cancelIfRunning(entityCleanupTask);
+        cancelIfRunning(chunkActivityCleanupTask);
+
+        autoChunkScanTask = null;
+        itemCleanerTask = null;
+        entityCleanupTask = null;
+        chunkActivityCleanupTask = null;
+    }
+
+    /**
+     * Cancels a BukkitRunnable if it is currently scheduled, tolerating the case
+     * where it was never scheduled or has already ended.
+     */
+    private void cancelIfRunning(org.bukkit.scheduler.BukkitRunnable task) {
+        if (task == null) {
+            return;
+        }
+        try {
+            task.cancel();
+        } catch (IllegalStateException ignored) {
+            // Task was never scheduled; nothing to cancel.
         }
     }
 
@@ -1289,6 +1351,11 @@ public class LagXpert extends JavaPlugin {
         // changed compatibility setting takes effect without a reconnect.
         reloadSubsystem(failures, "BedrockPlayerUtils",
                 () -> me.koyere.lagxpert.utils.BedrockPlayerUtils.clearCache());
+
+        // Reschedule the interval-driven tasks last, once every config value has been
+        // refreshed. A changed interval or a toggled module now takes effect
+        // immediately instead of requiring a restart.
+        reloadSubsystem(failures, "ScheduledTasks", this::schedulePluginTasks);
 
         if (failures.isEmpty()) {
             getLogger().info("[LagXpert] All configurations and subsystems reloaded successfully.");
