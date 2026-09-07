@@ -3,6 +3,7 @@ package me.koyere.lagxpert.listeners;
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.AlertCooldownManager;
 import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.system.MobAIOptimizer;
@@ -48,6 +49,34 @@ public class EntityListener implements Listener {
 
         Location spawnLocation = event.getLocation();
         Chunk chunk = spawnLocation.getChunk();
+
+        // Emergency response: block environmental mob spawning outright while the
+        // server is in a state that requests it. This is checked before the
+        // per-chunk limit logic because it is a server-wide measure, not a
+        // chunk-capacity decision.
+        if (EmergencyController.getInstance().shouldBlockNaturalSpawns()
+                && isEnvironmentalSpawn(event.getSpawnReason())
+                && !hasBypassPlayerNearby(chunk)) {
+
+            event.setCancelled(true);
+
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.SPAWN_BLOCKED,
+                    chunk.getWorld().getName(),
+                    chunk.getWorld().getName() + "_" + chunk.getX() + "_" + chunk.getZ(),
+                    "Natural spawn blocked by emergency state (" +
+                            EmergencyController.getInstance().getCurrentState().name() +
+                            "), reason: " + event.getSpawnReason().name(),
+                    1, "emergency", true, 0);
+
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info(
+                        "Blocked " + event.getSpawnReason().name() + " spawn at " +
+                                locationToString(spawnLocation) + " due to emergency state " +
+                                EmergencyController.getInstance().getCurrentState().name() + ".");
+            }
+            return;
+        }
 
         List<Player> playersInChunk = new ArrayList<>();
         for (Entity entity : chunk.getEntities()) {
@@ -145,6 +174,41 @@ public class EntityListener implements Listener {
         }
     }
 
+    /**
+     * Determines whether a spawn reason represents environmental spawning
+     * pressure that is safe to suppress during an emergency.
+     *
+     * Player- and plugin-driven spawns (spawn eggs, breeding, commands, custom
+     * plugin spawns) are never suppressed: blocking those would look like the
+     * server is broken rather than under load. The exact set is operator
+     * configurable in emergency-controller.yml.
+     *
+     * Comparison is by enum name rather than by constant reference, because the
+     * SpawnReason enum gained new values across the 1.16 to 1.21 range this
+     * plugin supports and referencing a missing constant would throw at runtime.
+     */
+    private boolean isEnvironmentalSpawn(CreatureSpawnEvent.SpawnReason reason) {
+        if (reason == null) {
+            return false;
+        }
+        return EmergencyController.getInstance().isBlockedSpawnReason(reason.name());
+    }
+
+    /**
+     * Returns true if any player in the chunk holds the mob bypass permission.
+     *
+     * Mirrors the bypass semantics of the per-chunk limit check so that a plot
+     * owner with bypass keeps working spawners during an emergency.
+     */
+    private boolean hasBypassPlayerNearby(Chunk chunk) {
+        for (Entity entity : chunk.getEntities()) {
+            if (entity instanceof Player && ((Player) entity).hasPermission("lagxpert.bypass.mobs")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Player findClosestPlayerToLocation(List<Player> players, Location location) {
         if (players == null || players.isEmpty()) {
             return null;
@@ -190,11 +254,16 @@ public class EntityListener implements Listener {
             }
         }
 
-        // Return custom limit if found, otherwise use EmergencyController-adjusted limit
+        // A permission-granted limit is an explicit operator decision for that
+        // player, so it is honored verbatim and not adaptively scaled.
         if (highestCustomLimit > 0) {
             return highestCustomLimit;
         }
-        return EmergencyController.getInstance().getEffectiveMobLimit(world);
+
+        // Route through the adaptive engine, which combines continuous health
+        // scaling with the EmergencyController's per-state mob cap multiplier and
+        // applies whichever is more restrictive.
+        return AdaptiveThresholdEngine.getInstance().getEffectiveMobLimit(world);
     }
 
     /**

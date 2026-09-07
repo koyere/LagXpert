@@ -329,6 +329,7 @@ public class AlertPipeline {
 
     /**
      * Resolves the message string from messagePath or rawMessage.
+     * Does NOT add prefix — the prefix is handled by delivery methods (console logger, player messages).
      */
     private String resolveMessage(AlertContext ctx) {
         if (ctx.getRawMessage() != null && !ctx.getRawMessage().isEmpty()) {
@@ -337,10 +338,9 @@ public class AlertPipeline {
 
         if (ctx.getMessagePath() != null && !ctx.getMessagePath().isEmpty()) {
             if (ctx.getPlaceholders() != null && !ctx.getPlaceholders().isEmpty()) {
-                return MessageManager.getPrefixedFormattedMessage(
-                        ctx.getMessagePath(), ctx.getPlaceholders());
+                return MessageManager.getFormatted(ctx.getMessagePath(), ctx.getPlaceholders());
             }
-            return MessageManager.getPrefixedMessage(ctx.getMessagePath());
+            return MessageManager.get(ctx.getMessagePath());
         }
 
         return null;
@@ -442,22 +442,23 @@ public class AlertPipeline {
             return;
         }
 
-        // Use MessageType based on severity
+        String prefixedMessage = MessageManager.getPrefix() + message;
+
         MessageType messageType;
         switch (level) {
             case EMERGENCY:
             case CRITICAL:
-                messageType = MessageType.BOTH; // Chat + ActionBar for critical
+                messageType = MessageType.BOTH;
                 break;
             case WARNING:
                 messageType = MessageType.CHAT;
                 break;
             default:
-                messageType = MessageType.ACTIONBAR; // Info goes to action bar
+                messageType = MessageType.ACTIONBAR;
                 break;
         }
 
-        MessageManager.sendMessage(player, message, messageType);
+        MessageManager.sendMessage(player, prefixedMessage, messageType);
     }
 
     /**

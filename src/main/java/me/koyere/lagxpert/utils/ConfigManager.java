@@ -221,6 +221,7 @@ public class ConfigManager {
     private static int consecutiveLagSpikesThreshold;
     private static int maxTrackedLagSpikes;
     private static boolean autoAnalyzeLagSpikes;
+    private static int lagSpikeAutoMuteAfter;
     private static boolean monitoringAlertsEnabled;
     private static boolean alertsToConsole;
     private static boolean alertsToPlayers;
@@ -553,6 +554,7 @@ public class ConfigManager {
         consecutiveLagSpikesThreshold = monitoringConfig.getInt("monitoring.lag-detection.consecutive-spikes-threshold", 3);
         maxTrackedLagSpikes = monitoringConfig.getInt("monitoring.lag-detection.max-tracked-spikes", 100);
         autoAnalyzeLagSpikes = monitoringConfig.getBoolean("monitoring.lag-detection.auto-analyze", true);
+        lagSpikeAutoMuteAfter = monitoringConfig.getInt("monitoring.lag-detection.auto-mute-after-alerts", 5);
 
         monitoringAlertsEnabled = monitoringConfig.getBoolean("alerts.enabled", true);
         alertsToConsole = monitoringConfig.getBoolean("alerts.delivery.console", true);
@@ -1197,6 +1199,64 @@ public class ConfigManager {
     }
 
     /**
+     * Reads an arbitrary value from one of the loaded configuration files.
+     *
+     * Generic accessor used by the profile system, which needs to snapshot and
+     * restore values across many files without a dedicated getter for each one.
+     *
+     * @param fileName the config file name, e.g. {@code "mobs.yml"}
+     * @param path     the YAML path within that file
+     * @return the current value, or null if the file or path is unknown
+     */
+    public static Object getRawConfigValue(String fileName, String path) {
+        FileConfiguration config = loadedConfigs.get(fileName);
+        if (config == null) {
+            return null;
+        }
+        return config.get(path);
+    }
+
+    /**
+     * Returns true when the given config file is loaded and contains the path.
+     */
+    public static boolean hasRawConfigValue(String fileName, String path) {
+        FileConfiguration config = loadedConfigs.get(fileName);
+        return config != null && config.contains(path);
+    }
+
+    /**
+     * Writes an arbitrary value into one of the loaded configuration files.
+     *
+     * The value is written to the in-memory configuration only. Call
+     * {@link #saveModifiedConfigs()} to persist, then {@link #loadAll()} to make
+     * the change take effect in the cached static fields.
+     *
+     * @param fileName the config file name, e.g. {@code "storage.yml"}
+     * @param path     the YAML path within that file
+     * @param value    the new value, or null to remove the key
+     * @return true if the value was written
+     */
+    public static boolean setRawConfigValue(String fileName, String path, Object value) {
+        FileConfiguration config = loadedConfigs.get(fileName);
+        if (config == null) {
+            LagXpert.getInstance().getLogger().warning(
+                    "[ConfigManager] Cannot write '" + path + "': config file '" + fileName + "' is not loaded.");
+            return false;
+        }
+        config.set(path, value);
+        return true;
+    }
+
+    /**
+     * Public wrapper that persists every loaded configuration file to disk.
+     *
+     * @return true if all files were saved successfully
+     */
+    public static boolean saveModifiedConfigs() {
+        return saveAllModifiedConfigs();
+    }
+
+    /**
      * Saves all modified configuration files to disk.
      *
      * @return true if all files were saved successfully
@@ -1251,8 +1311,11 @@ public class ConfigManager {
     public static int getMaxShulkerBoxesPerChunk() { return maxShulkerBoxesPerChunk; }
     public static int getMaxShulkerBoxesPerChunk(World world) { return WorldConfigManager.getShulkerBoxesPerChunk(world); }
     public static int getMaxTntPerChunk() { return maxTntPerChunk; }
+    public static int getMaxTntPerChunk(World world) { return WorldConfigManager.getTntPerChunk(world); }
     public static int getMaxPistonsPerChunk() { return maxPistonsPerChunk; }
+    public static int getMaxPistonsPerChunk(World world) { return WorldConfigManager.getPistonsPerChunk(world); }
     public static int getMaxObserversPerChunk() { return maxObserversPerChunk; }
+    public static int getMaxObserversPerChunk(World world) { return WorldConfigManager.getObserversPerChunk(world); }
 
     // --- Getters for Redstone Control ---
     public static int getRedstoneActiveTicks() { return redstoneActiveTicks; }
@@ -1298,6 +1361,7 @@ public class ConfigManager {
     public static boolean shouldCleanupEmptyItemFrames() { return cleanupEmptyItemFrames; }
     public static boolean shouldCleanupEmptyArmorStands() { return cleanupEmptyArmorStands; }
     public static int getMaxEntitiesPerChunk() { return maxEntitiesPerChunk; }
+    public static int getMaxEntitiesPerChunk(World world) { return WorldConfigManager.getMaxEntitiesPerChunk(world); }
     public static double getDuplicateDetectionRadius() { return duplicateDetectionRadius; }
     public static int getAbandonedVehicleTimeoutSeconds() { return abandonedVehicleTimeoutSeconds; }
     public static boolean shouldSkipNamedEntities() { return skipNamedEntities; }
@@ -1346,6 +1410,7 @@ public class ConfigManager {
     public static int getConsecutiveLagSpikesThreshold() { return consecutiveLagSpikesThreshold; }
     public static int getMaxTrackedLagSpikes() { return maxTrackedLagSpikes; }
     public static boolean shouldAutoAnalyzeLagSpikes() { return autoAnalyzeLagSpikes; }
+    public static int getLagSpikeAutoMuteAfter() { return lagSpikeAutoMuteAfter; }
     public static boolean isMonitoringAlertsEnabled() { return monitoringAlertsEnabled; }
     public static boolean shouldSendAlertsToConsole() { return alertsToConsole; }
     public static boolean shouldSendAlertsToPlayers() { return alertsToPlayers; }

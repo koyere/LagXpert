@@ -32,13 +32,34 @@ public class PerformanceHistory {
 
     private static PerformanceHistory instance;
 
-    private static final int MAX_SNAPSHOTS = 2016; // 7 days at 5min intervals
-    private static final long SNAPSHOT_INTERVAL_MS = 300_000L; // 5 minutes
+    /** Floor for the snapshot interval; anything shorter is pointless overhead. */
+    private static final long MIN_SNAPSHOT_INTERVAL_MS = 60_000L;
+
+    /** Absolute cap on retained snapshots, protecting memory from a huge config value. */
+    private static final int ABSOLUTE_MAX_SNAPSHOTS = 20_000;
 
     private final LinkedList<ServerSnapshot> snapshots = new LinkedList<>();
     private final Object bufferLock = new Object();
     private long lastSnapshotTime = 0;
     private boolean enabled = true;
+
+    /**
+     * Interval between snapshots, from
+     * {@code performance-history.snapshot-interval-seconds}.
+     *
+     * Previously a hardcoded constant, which meant the documented config key did
+     * nothing.
+     */
+    private long snapshotIntervalMs = 300_000L;
+
+    /**
+     * Retention window in days, from {@code performance-history.max-history-days}.
+     * Also previously ignored.
+     */
+    private int maxHistoryDays = 7;
+
+    /** Derived from the interval and retention window rather than hardcoded. */
+    private int maxSnapshots = 2016;
 
     /**
      * Immutable snapshot of server state at a point in time.
@@ -123,14 +144,70 @@ public class PerformanceHistory {
         return instance;
     }
 
-    private void loadConfig() {
+    /**
+     * Reads history settings from config.yml. Public so that
+     * {@code /lagxpert reload} can refresh them without a restart.
+     */
+    public void loadConfig() {
         java.io.File configFile = new java.io.File(
                 LagXpert.getInstance().getDataFolder(), "config.yml");
-        if (configFile.exists()) {
-            org.bukkit.configuration.file.FileConfiguration config =
-                    org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
-            this.enabled = config.getBoolean("performance-history.enabled", true);
+        if (!configFile.exists()) {
+            recalculateCapacity();
+            return;
         }
+
+        org.bukkit.configuration.file.FileConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+
+        this.enabled = config.getBoolean("performance-history.enabled", true);
+
+        long intervalSeconds = config.getLong("performance-history.snapshot-interval-seconds", 300);
+        long requestedIntervalMs = intervalSeconds * 1000L;
+        if (requestedIntervalMs < MIN_SNAPSHOT_INTERVAL_MS) {
+            LagXpert.getInstance().getLogger().warning(
+                    "[PerformanceHistory] snapshot-interval-seconds is " + intervalSeconds +
+                            "s, which is below the 60s minimum. Using 60s.");
+            requestedIntervalMs = MIN_SNAPSHOT_INTERVAL_MS;
+        }
+        this.snapshotIntervalMs = requestedIntervalMs;
+
+        this.maxHistoryDays = Math.max(1, config.getInt("performance-history.max-history-days", 7));
+
+        recalculateCapacity();
+    }
+
+    /**
+     * Derives the snapshot capacity from the interval and retention window, then
+     * trims any excess that a shortened window has made obsolete.
+     */
+    private void recalculateCapacity() {
+        long snapshotsPerDay = Math.max(1L, 86_400_000L / snapshotIntervalMs);
+        long computed = snapshotsPerDay * maxHistoryDays;
+
+        this.maxSnapshots = (int) Math.max(1, Math.min(ABSOLUTE_MAX_SNAPSHOTS, computed));
+
+        // A reload that lowers retention should take effect immediately rather
+        // than waiting for the buffer to churn through the old entries.
+        synchronized (bufferLock) {
+            while (snapshots.size() > maxSnapshots) {
+                snapshots.removeFirst();
+            }
+        }
+    }
+
+    /**
+     * Returns the interval between snapshots in server ticks, for scheduling.
+     */
+    public long getSnapshotIntervalTicks() {
+        return Math.max(20L, snapshotIntervalMs / 50L);
+    }
+
+    public int getMaxSnapshots() {
+        return maxSnapshots;
+    }
+
+    public int getMaxHistoryDays() {
+        return maxHistoryDays;
     }
 
     /**
@@ -141,18 +218,30 @@ public class PerformanceHistory {
         if (!enabled) return;
 
         long now = System.currentTimeMillis();
-        if (now - lastSnapshotTime < SNAPSHOT_INTERVAL_MS) return;
+        if (now - lastSnapshotTime < snapshotIntervalMs) return;
         lastSnapshotTime = now;
 
-        int totalEntities = 0;
         int totalChunks = 0;
-        for (World world : Bukkit.getWorlds()) {
-            totalEntities += world.getEntities().size();
+        java.util.List<World> worlds = Bukkit.getWorlds();
+        for (World world : worlds) {
             totalChunks += world.getLoadedChunks().length;
         }
 
+        final int chunkCount = totalChunks;
+
+        // Entity counting walks loaded chunks under region dispatch rather than
+        // calling world.getEntities(), which reaches across region boundaries and
+        // is therefore not safe on Folia. The snapshot is recorded in the callback.
+        me.koyere.lagxpert.utils.RegionizedSweeper.countEntities(worlds, totalEntities ->
+                storeSnapshot(now, chunkCount, totalEntities));
+    }
+
+    /**
+     * Records a completed snapshot into the ring buffer.
+     */
+    private void storeSnapshot(long timestamp, int totalChunks, int totalEntities) {
         ServerSnapshot snapshot = new ServerSnapshot(
-                now,
+                timestamp,
                 TPSMonitor.getShortTermTPS(),
                 getMemoryPercent(),
                 totalChunks,
@@ -163,7 +252,7 @@ public class PerformanceHistory {
 
         synchronized (bufferLock) {
             snapshots.addLast(snapshot);
-            while (snapshots.size() > MAX_SNAPSHOTS) {
+            while (snapshots.size() > maxSnapshots) {
                 snapshots.removeFirst();
             }
         }
@@ -329,7 +418,7 @@ public class PerformanceHistory {
             List<String> lines = Files.readAllLines(file.toPath());
             synchronized (bufferLock) {
                 snapshots.clear();
-                for (int i = 1; i < lines.size() && snapshots.size() < MAX_SNAPSHOTS; i++) {
+                for (int i = 1; i < lines.size() && snapshots.size() < maxSnapshots; i++) {
                     String[] parts = lines.get(i).split(",");
                     if (parts.length >= 7) {
                         try {

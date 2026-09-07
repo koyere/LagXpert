@@ -28,7 +28,7 @@ import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.PlatformDetector;
 import me.koyere.lagxpert.utils.SchedulerWrapper;
 import me.koyere.lagxpert.utils.BedrockPlayerUtils;
-import me.koyere.lagxpert.gui.BedrockCompatibleGUI;
+
 import me.koyere.lagxpert.system.SmartMobManager;
 import me.koyere.lagxpert.system.SmartScheduler;
 import org.bstats.bukkit.Metrics;
@@ -55,6 +55,13 @@ public class LagXpert extends JavaPlugin {
     private static final int BSTATS_PLUGIN_ID = 25746; // bStats Plugin ID for metrics.
     private Metrics bStatsInstance; // Store the bStats Metrics instance
     private me.koyere.lagxpert.system.ConsoleFilter consoleFilter;
+
+    // Listener instances retained purely so their configuration can be reloaded
+    // at runtime. These classes read their own YAML files into private fields at
+    // construction, so a reference is required to refresh them.
+    private me.koyere.lagxpert.system.ExplosionController explosionController;
+    private me.koyere.lagxpert.system.VehicleManager vehicleManager;
+    private me.koyere.lagxpert.system.AbilityLimiter abilityLimiter;
 
     /**
      * Returns the static instance of this plugin.
@@ -101,6 +108,7 @@ public class LagXpert extends JavaPlugin {
         initializeAdaptiveThresholds();
         initializePerformanceHistory();
         initializeSmartScheduler();
+        initializeProfileManager();
 
         getLogger().info("LagXpert Free v" + getDescription().getVersion() + " enabled successfully on " +
                 PlatformDetector.getPlatformSummary() + " with multi-platform compatibility.");
@@ -129,6 +137,13 @@ public class LagXpert extends JavaPlugin {
         // Shutdown Phase 3 Proactive Intelligence
         shutdownPerformanceHistory();
         shutdownSmartScheduler();
+
+        // Cancel any pending profile auto-revert timer.
+        try {
+            me.koyere.lagxpert.system.ProfileManager.getInstance().shutdown();
+        } catch (Exception e) {
+            getLogger().warning("[LagXpert] Error during Profile Manager shutdown: " + e.getMessage());
+        }
 
         // Shutdown ConsoleFilter
         if (consoleFilter != null) {
@@ -286,12 +301,21 @@ public class LagXpert extends JavaPlugin {
      */
     private void initializePerformanceHistory() {
         try {
-            // Schedule snapshot recording every 5 minutes
-            long intervalTicks = 6000L; // 5 minutes
+            // Construct the singleton now rather than letting the scheduled lambda do
+            // it later. Its constructor loads the saved history from disk, so lazy
+            // construction meant stored data only reappeared after the first
+            // snapshot interval elapsed, or when an admin happened to run a command.
+            PerformanceHistory history = PerformanceHistory.getInstance();
+
+            // Honor the configured interval instead of a hardcoded five minutes.
+            long intervalTicks = history.getSnapshotIntervalTicks();
             me.koyere.lagxpert.utils.SchedulerWrapper.runTaskTimer(
-                    () -> PerformanceHistory.getInstance().recordSnapshot(),
-                    intervalTicks, intervalTicks);
-            getLogger().info("[LagXpert] Performance History tracking initialized.");
+                    history::recordSnapshot, intervalTicks, intervalTicks);
+
+            getLogger().info("[LagXpert] Performance History tracking initialized (" +
+                    history.getSnapshotCount() + " snapshot(s) loaded, keeping " +
+                    history.getMaxHistoryDays() + " day(s), interval " +
+                    (intervalTicks / 20) + "s).");
         } catch (Exception e) {
             getLogger().severe("[LagXpert] Failed to initialize Performance History: " + e.getMessage());
         }
@@ -306,6 +330,20 @@ public class LagXpert extends JavaPlugin {
             getLogger().info("[LagXpert] Smart Scheduler initialized.");
         } catch (Exception e) {
             getLogger().severe("[LagXpert] Failed to initialize Smart Scheduler: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads the optimization profile definitions from profiles.yml.
+     */
+    private void initializeProfileManager() {
+        try {
+            me.koyere.lagxpert.system.ProfileManager manager =
+                    me.koyere.lagxpert.system.ProfileManager.getInstance();
+            getLogger().info("[LagXpert] Profile Manager initialized (" +
+                    manager.getProfileNames().size() + " profile(s) available).");
+        } catch (Exception e) {
+            getLogger().severe("[LagXpert] Failed to initialize Profile Manager: " + e.getMessage());
         }
     }
 
@@ -371,7 +409,8 @@ public class LagXpert extends JavaPlugin {
                 content.append("limits:\n");
                 content.append("  mobs-per-chunk: 25\n");
                 content.append("  hoppers-per-chunk: 6\n");
-                content.append("  tnt-per-chunk: 0 # No TNT in nether by default\n");
+                // 1, not 0: a limit of 0 means "no limit" throughout the plugin.
+                content.append("  tnt-per-chunk: 1 # Very strict; use 0 for unlimited\n");
                 content.append("\n");
                 content.append("# More aggressive entity cleanup in nether\n");
                 content.append("entity-cleanup:\n");
@@ -485,10 +524,16 @@ public class LagXpert extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new ChunkActivityListener(), this);
         }
 
-        // Phase 2: Register ExplosionController/VehicleManager/AbilityLimiter
-        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.ExplosionController(), this);
-        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.VehicleManager(), this);
-        getServer().getPluginManager().registerEvents(new me.koyere.lagxpert.system.AbilityLimiter(), this);
+        // Phase 2: Register ExplosionController/VehicleManager/AbilityLimiter.
+        // References are retained so /lagxpert reload can re-read their YAML files;
+        // without them these listeners would serve their startup config forever.
+        explosionController = new me.koyere.lagxpert.system.ExplosionController();
+        vehicleManager = new me.koyere.lagxpert.system.VehicleManager();
+        abilityLimiter = new me.koyere.lagxpert.system.AbilityLimiter();
+
+        getServer().getPluginManager().registerEvents(explosionController, this);
+        getServer().getPluginManager().registerEvents(vehicleManager, this);
+        getServer().getPluginManager().registerEvents(abilityLimiter, this);
 
         // ConsoleFilter is self-initializing its injection in constructor, or use a
         // manager?
@@ -638,11 +683,10 @@ public class LagXpert extends JavaPlugin {
                 getLogger().info("[LagXpert] Using standard Bukkit scheduler");
             }
 
-            // Initialize Bedrock player detection
+            // Initialize Bedrock player detection.
+            // Bedrock-safe rendering is applied per screen at open time by
+            // BedrockUI, so there is no separate template system to initialise.
             BedrockPlayerUtils.initializeBedrockAPIs();
-
-            // Initialize cross-platform GUI system
-            BedrockCompatibleGUI.initializeTemplates();
 
             if (ConfigManager.isDebugEnabled()) {
                 getLogger().info("[LagXpert] Platform detection completed:");
@@ -1178,6 +1222,99 @@ public class LagXpert extends JavaPlugin {
     }
 
     /**
+     * Reloads every configuration file and re-applies it to every subsystem.
+     *
+     * This is the single entry point for {@code /lagxpert reload} and for the
+     * profile system. It exists because reloading only {@link ConfigManager} is
+     * not enough: several subsystems read their own YAML files directly into
+     * private fields at construction time, so without an explicit call they keep
+     * serving stale values until the server restarts.
+     *
+     * Each subsystem is reloaded independently and failures are contained, so one
+     * broken config section cannot abort the rest of the reload.
+     *
+     * @return a list of subsystem names that failed to reload, empty on success
+     */
+    public java.util.List<String> reloadAllConfigurations() {
+        java.util.List<String> failures = new java.util.ArrayList<>();
+
+        // Core config first: everything else reads values that this populates.
+        try {
+            ConfigManager.loadAll();
+        } catch (Exception e) {
+            failures.add("ConfigManager");
+            getLogger().severe("[LagXpert] Failed to reload core configuration: " + e.getMessage());
+        }
+
+        reloadSubsystem(failures, "AbyssManager", () -> AbyssManager.loadConfig());
+        reloadSubsystem(failures, "WorldConfigManager", () -> WorldConfigManager.reloadAll());
+        reloadSubsystem(failures, "EmergencyController",
+                () -> me.koyere.lagxpert.system.EmergencyController.getInstance().loadConfig());
+        reloadSubsystem(failures, "EmergencyResponseCoordinator",
+                () -> me.koyere.lagxpert.system.EmergencyResponseCoordinator.getInstance().loadConfig());
+        reloadSubsystem(failures, "AdaptiveThresholdEngine",
+                () -> me.koyere.lagxpert.system.AdaptiveThresholdEngine.getInstance().loadConfig());
+        reloadSubsystem(failures, "ActionLogger",
+                () -> me.koyere.lagxpert.system.ActionLogger.getInstance().initialize());
+        reloadSubsystem(failures, "PerformanceHistory",
+                () -> me.koyere.lagxpert.system.PerformanceHistory.getInstance().loadConfig());
+        reloadSubsystem(failures, "ProfileManager",
+                () -> me.koyere.lagxpert.system.ProfileManager.getInstance().loadConfig());
+        reloadSubsystem(failures, "MobAIOptimizer",
+                () -> me.koyere.lagxpert.system.MobAIOptimizer.getInstance().reloadConfig());
+        reloadSubsystem(failures, "ExplosionController", () -> {
+            if (explosionController != null) {
+                explosionController.reloadConfig();
+            }
+        });
+        reloadSubsystem(failures, "VehicleManager", () -> {
+            if (vehicleManager != null) {
+                vehicleManager.reloadConfig();
+            }
+        });
+        reloadSubsystem(failures, "AbilityLimiter", () -> {
+            if (abilityLimiter != null) {
+                abilityLimiter.reloadConfig();
+            }
+        });
+        reloadSubsystem(failures, "RedstoneCircuitTracker",
+                () -> me.koyere.lagxpert.system.RedstoneCircuitTracker.loadConfig());
+        reloadSubsystem(failures, "ConsoleFilter", () -> {
+            if (consoleFilter != null) {
+                consoleFilter.reloadConfig();
+            }
+        });
+
+        // Bedrock platform detection caches per-player results; drop them so a
+        // changed compatibility setting takes effect without a reconnect.
+        reloadSubsystem(failures, "BedrockPlayerUtils",
+                () -> me.koyere.lagxpert.utils.BedrockPlayerUtils.clearCache());
+
+        if (failures.isEmpty()) {
+            getLogger().info("[LagXpert] All configurations and subsystems reloaded successfully.");
+        } else {
+            getLogger().warning("[LagXpert] Reload completed with failures in: " + failures);
+        }
+
+        return failures;
+    }
+
+    /**
+     * Runs one subsystem reload, recording rather than propagating any failure.
+     */
+    private void reloadSubsystem(java.util.List<String> failures, String name, Runnable action) {
+        try {
+            action.run();
+            if (ConfigManager.isDebugEnabled()) {
+                getLogger().info("[LagXpert] Reloaded subsystem: " + name);
+            }
+        } catch (Exception e) {
+            failures.add(name);
+            getLogger().warning("[LagXpert] Failed to reload " + name + ": " + e.getMessage());
+        }
+    }
+
+    /**
      * Reloads per-world configurations.
      * NEW: Allows runtime reloading of per-world configuration files.
      */
@@ -1263,6 +1400,12 @@ public class LagXpert extends JavaPlugin {
     private void initializeEmergencyController() {
         try {
             EmergencyController.getInstance().loadConfig();
+
+            // Eagerly register the response coordinator. Relying on lazy singleton
+            // construction would leave the listener dormant until something else
+            // happened to touch it, which is how these responses went unexecuted.
+            me.koyere.lagxpert.system.EmergencyResponseCoordinator.getInstance().register();
+
             getLogger().info("[LagXpert] Emergency Controller initialized.");
         } catch (Exception e) {
             getLogger().severe("[LagXpert] Failed to initialize Emergency Controller: " + e.getMessage());
@@ -1288,6 +1431,9 @@ public class LagXpert extends JavaPlugin {
      */
     private void shutdownEmergencyController() {
         try {
+            // Lift any active AI freeze before tearing the controller down, so mobs
+            // are never left permanently frozen by a shutdown mid-emergency.
+            me.koyere.lagxpert.system.EmergencyResponseCoordinator.getInstance().shutdown();
             EmergencyController.getInstance().shutdown();
             getLogger().info("[LagXpert] Emergency Controller shutdown completed.");
         } catch (Exception e) {

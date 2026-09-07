@@ -234,7 +234,9 @@ public class SmartMobManager {
             return 0;
         }
         
-        int mobLimit = EmergencyController.getInstance().getEffectiveMobLimit(chunk.getWorld());
+        // Adaptive engine combines continuous health scaling with the emergency
+        // state multiplier, so removal thresholds tighten as the server degrades.
+        int mobLimit = AdaptiveThresholdEngine.getInstance().getEffectiveMobLimit(chunk.getWorld());
         List<LivingEntity> livingEntities = mobData.getLivingEntities();
         int currentCount = livingEntities.size();
         

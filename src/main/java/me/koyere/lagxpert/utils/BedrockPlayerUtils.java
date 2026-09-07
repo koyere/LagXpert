@@ -120,6 +120,14 @@ public class BedrockPlayerUtils {
         if (cached != null) {
             return cached;
         }
+
+        // Late initialisation safety net. If Geyser or Floodgate finished loading
+        // after our own startup, the cached reflection handles would still be null
+        // and every player would be misreported as Java for the rest of the session.
+        if (!hasBedrockSupport() && PlatformDetector.hasBedrockSupport()) {
+            initialized = false;
+            initializeBedrockAPIs();
+        }
         
         // Perform detection and cache result
         boolean isBedrock = detectBedrockPlayer(playerId);
@@ -156,24 +164,30 @@ public class BedrockPlayerUtils {
             }
         }
         
-        // Fallback: Check username pattern (Floodgate prefixes Bedrock users)
-        return checkUsernamePattern(playerId);
+        // Neither API answered. Fall back to inspecting the UUID structure.
+        return checkUuidStructure(playerId);
     }
     
     /**
-     * Fallback method to detect Bedrock players by username pattern.
-     * Floodgate typically prefixes Bedrock usernames with a dot or specific pattern.
+     * Last-resort detection used when neither the Geyser nor the Floodgate API
+     * is reachable.
+     *
+     * Floodgate derives a Bedrock player's UUID from their Xbox user ID by placing
+     * the XUID in the low 64 bits and leaving the high 64 bits zero. Testing
+     * {@code getMostSignificantBits() == 0} therefore identifies a Floodgate UUID
+     * structurally, which is far more dependable than matching the string form.
+     *
+     * A Mojang account UUID is a random version 4 value, so its high bits contain
+     * the version nibble and are never zero. A false positive is effectively
+     * impossible; a false negative only happens if a Bedrock player somehow has a
+     * linked Java UUID, in which case treating them as a Java client is correct
+     * anyway.
+     *
+     * This heuristic only ever runs when the proper APIs are unavailable.
      */
-    private static boolean checkUsernamePattern(UUID playerId) {
+    private static boolean checkUuidStructure(UUID playerId) {
         try {
-            // This is a basic fallback - not 100% reliable
-            // Floodgate users typically have a specific UUID pattern or prefix
-            String uuidString = playerId.toString();
-            
-            // Floodgate UUIDs often start with specific patterns
-            // This is a simplified check - production code should use proper APIs
-            return uuidString.startsWith("00000000-0000-0000");
-            
+            return playerId.getMostSignificantBits() == 0L;
         } catch (Exception e) {
             return false;
         }

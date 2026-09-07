@@ -143,31 +143,64 @@ action-logger:
   # Maximum entries in the circular buffer before oldest are dropped
   max-entries: 10000
 
-# 📊 Adaptive Thresholds (v2.9+)
-# Dynamically adjusts all limits based on real-time server health.
-# When TPS drops or memory usage rises, limits are proportionally reduced.
+# 📊 Adaptive Thresholds (v2.7+)
+# Dynamically adjusts limits based on real-time server health.
+# When TPS drops or memory usage rises, limits are proportionally reduced;
+# when the server recovers, they return to the values configured elsewhere.
+#
+# Limits are only ever scaled DOWN. The numbers you set in mobs.yml,
+# storage.yml and redstone.yml are always treated as the ceiling.
+#
+# This works together with emergency-controller.yml: the continuous health
+# scaling below and the emergency state's step changes are both computed, and
+# whichever is more restrictive wins. They are never multiplied together.
+#
+# Per-player limits granted through 'lagxpert.limits.*' permissions are
+# deliberately exempt and are always honored verbatim.
 adaptive-thresholds:
   # Master toggle for adaptive thresholds
   enabled: true
 
-  # Sensitivity per limit category (0.0 = no adjustment, 1.0 = full adjustment)
-  # Lower sensitivity = limits change less aggressively when server is stressed
+  # Sensitivity per limit category (0.0 = never adjust, 1.0 = track health fully)
+  # Lower sensitivity = limits change less aggressively when the server is stressed
   sensitivity:
     mobs: 1.0       # Mobs are fully sensitive to server health
-    storage: 0.7    # Storage blocks less sensitive (player builds shouldn't vanish)
+    storage: 0.7    # Storage blocks less sensitive (don't disrupt player builds)
     entities: 1.0   # Entity cleanup thresholds fully sensitive
-    redstone: 1.0   # Redstone circuit limits fully sensitive
+    redstone: 1.0   # Redstone circuit tolerance fully sensitive
 
-# 📈 Performance History (v2.9+)
+  # Hard floor for any computed multiplier. Guarantees a degraded server can
+  # never reduce a limit below this fraction of its configured value, so limits
+  # can never collapse to something unplayable.
+  minimum-multiplier: 0.25
+
+  # Defines what "healthy" and "degraded" mean for the health calculation.
+  # The health factor is the WORSE of the TPS component and the memory
+  # component, so good memory cannot mask a bad TPS reading.
+  health:
+    # TPS at or above this = fully healthy (factor 1.0)
+    healthy-tps: 20.0
+    # TPS at or below this = fully degraded (factor bottoms out)
+    degraded-tps: 10.0
+    # Heap usage % at or below this = fully healthy
+    healthy-memory-percent: 50.0
+    # Heap usage % at or above this = fully degraded
+    degraded-memory-percent: 95.0
+
+# 📈 Performance History (v2.7+)
 # Collects periodic snapshots for trend analysis and peak prediction.
+# Data is persisted to performance-history.dat and survives restarts.
 performance-history:
   # Enable periodic snapshot collection
   enabled: true
 
-  # Interval between snapshots (seconds, 300 = 5 minutes)
+  # Interval between snapshots (seconds, 300 = 5 minutes).
+  # Minimum enforced value is 60 seconds.
   snapshot-interval-seconds: 300
 
-  # Maximum days of history to keep (older snapshots are discarded)
+  # Maximum days of history to keep (older snapshots are discarded).
+  # Memory use scales with this: roughly 288 snapshots per day at the
+  # default 5 minute interval.
   max-history-days: 7
 
 # 🌐 NEW v2.2: Platform Detection & Multi-Platform Support

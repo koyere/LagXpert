@@ -284,13 +284,20 @@ public class RedstoneCircuitTracker {
         long currentTime = System.currentTimeMillis();
         String locationKey = circuit.getCircuitId();
 
+        // Redstone tolerance scales with server health: a struggling server puts up
+        // with fewer pulses and shorter continuous activity before intervening.
+        double redstoneMultiplier = AdaptiveThresholdEngine.getInstance()
+                .getMultiplier(AdaptiveThresholdEngine.LimitCategory.REDSTONE);
+
         // Check pulse frequency
         AtomicInteger pulseCounter = pulseCounters.get(locationKey);
         if (pulseCounter != null) {
             // Reset counter and check if it exceeded limits
             int pulsesInWindow = pulseCounter.getAndSet(0);
 
-            if (pulsesInWindow > maxPulsesPerWindow) {
+            int effectiveMaxPulses = Math.max(1, (int) Math.floor(maxPulsesPerWindow * redstoneMultiplier));
+
+            if (pulsesInWindow > effectiveMaxPulses) {
                 scheduleCircuitShutdown(circuit, "high_frequency", getGracePeriod(circuit.getType()));
                 return;
             }
@@ -298,7 +305,7 @@ public class RedstoneCircuitTracker {
 
         // Check continuous activity duration
         long activeDuration = currentTime - circuit.getCreationTime();
-        long maxDuration = getMaxDuration(circuit.getType());
+        long maxDuration = (long) Math.max(1000L, getMaxDuration(circuit.getType()) * redstoneMultiplier);
 
         if (activeDuration > maxDuration) {
             scheduleCircuitShutdown(circuit, "long_duration", getGracePeriod(circuit.getType()));

@@ -483,4 +483,30 @@ public class InactiveChunkUnloader extends BukkitRunnable {
             });
         }
     }
+
+    /**
+     * Runs one unload cycle on the calling thread and reports how many chunks
+     * were actually unloaded.
+     *
+     * {@link #triggerManualUnload()} dispatches asynchronously and returns
+     * immediately, which makes it impossible for a caller to report a result.
+     * {@code /lagxpert optimize} needs a real number, so this variant runs inline
+     * and measures the change in the unload counter.
+     *
+     * Must be called from the main/region thread.
+     *
+     * @return the number of chunks unloaded by this cycle
+     */
+    public static int runImmediate() {
+        InactiveChunkUnloader task = instance;
+        if (task == null) {
+            // The scheduled task is not running (module disabled), but an explicit
+            // request should still work, so use a throwaway instance.
+            task = new InactiveChunkUnloader();
+        }
+
+        int before = totalChunksUnloaded.get();
+        task.run();
+        return Math.max(0, totalChunksUnloaded.get() - before);
+    }
 }

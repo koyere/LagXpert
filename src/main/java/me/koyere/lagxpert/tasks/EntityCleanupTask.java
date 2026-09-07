@@ -1,12 +1,14 @@
 package me.koyere.lagxpert.tasks;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
@@ -25,6 +27,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.EmergencyController;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
@@ -44,6 +47,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     private static final AtomicInteger abandonedVehiclesRemoved = new AtomicInteger(0);
     private static final AtomicInteger emptyContainersRemoved = new AtomicInteger(0);
     private static final AtomicInteger outOfBoundsEntitiesRemoved = new AtomicInteger(0);
+    private static final AtomicInteger overpopulatedChunksTrimmed = new AtomicInteger(0);
 
     @Override
     public void run() {
@@ -55,18 +59,61 @@ public class EntityCleanupTask extends BukkitRunnable {
             LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Starting entity cleanup cycle...");
         }
 
-        long startTime = System.currentTimeMillis();
-        int totalCleaned = 0;
+        sweep(null);
+    }
 
-        for (World world : Bukkit.getWorlds()) {
-            if (!isWorldEnabled(world)) {
-                continue;
+    /**
+     * Runs a full cleanup cycle across every enabled world.
+     *
+     * Work is dispatched per chunk rather than per world: a whole-world entity
+     * query cannot be performed safely on Folia, where each region owns its own
+     * chunks and entities. On Spigot and Paper the same dispatch spreads the work
+     * across ticks, which turns one stalling tick into several short ones.
+     *
+     * @param onComplete Receives the total removed, on the main thread. May be null.
+     */
+    public static void sweep(java.util.function.IntConsumer onComplete) {
+        if (!ConfigManager.isEntityCleanupEnabled()) {
+            if (onComplete != null) {
+                onComplete.accept(0);
             }
-
-            totalCleaned += cleanupWorldEntities(world);
+            return;
         }
 
-        long duration = System.currentTimeMillis() - startTime;
+        if (ConfigManager.isDebugEnabled()) {
+            LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Starting entity cleanup cycle...");
+        }
+
+        List<World> targets = new ArrayList<>();
+        for (World world : Bukkit.getWorlds()) {
+            if (isWorldEnabled(world)) {
+                targets.add(world);
+            }
+        }
+
+        // Budget shared across the whole cycle so a single sweep cannot remove an
+        // unbounded number of entities regardless of how many chunks are loaded.
+        AtomicInteger budget = new AtomicInteger(Math.max(1, ConfigManager.getMaxEntitiesPerCycle()));
+
+        me.koyere.lagxpert.utils.RegionizedSweeper.sweep(
+                targets, "entity-cleanup",
+                chunk -> {
+                    if (budget.get() <= 0) {
+                        return 0;
+                    }
+                    int removed = cleanupChunkEntities(chunk, budget);
+                    removed += trimOverpopulatedChunk(chunk, budget);
+                    return removed;
+                },
+                result -> reportSweep(result.getTotal(), result.getDurationMs(), onComplete));
+    }
+
+    /**
+     * Broadcasts, records and reports the outcome of a completed cycle.
+     * Runs on the main thread after every chunk has been visited.
+     */
+    private static void reportSweep(int totalCleaned, long duration,
+                                    java.util.function.IntConsumer onComplete) {
         totalEntitiesRemoved.addAndGet(totalCleaned);
 
         // Broadcast completion message if enabled and threshold is met
@@ -95,19 +142,129 @@ public class EntityCleanupTask extends BukkitRunnable {
                             "Removed: " + totalCleaned + " entities"
             );
         }
+
+        if (onComplete != null) {
+            onComplete.accept(totalCleaned);
+        }
     }
 
     /**
-     * Performs comprehensive entity cleanup for a specific world.
+     * Trims chunks whose total entity count exceeds the configured per-chunk
+     * ceiling from {@code entity-cleanup.advanced.max-entities-per-chunk}.
+     *
+     * The ordinary cleanup above only removes entities that are individually
+     * defective (invalid, out of bounds, abandoned, empty). That leaves the case
+     * where thousands of perfectly valid entities pile into one chunk and stall
+     * the server. This pass handles exactly that case.
+     *
+     * The ceiling is scaled by the adaptive engine's ENTITIES sensitivity, so a
+     * degraded server trims more aggressively than a healthy one.
+     *
+     * Protected entities (named, tamed, leashed, ridden, persistent, plugin-created,
+     * villagers with trades, and configured protected types) are never removed, so a
+     * chunk legitimately full of protected entities is left alone rather than
+     * repeatedly retried.
+     *
+     * @return number of entities removed.
      */
-    private int cleanupWorldEntities(World world) {
-        int removedCount = 0;
-        List<Entity> allEntities = world.getEntities();
+    private static int trimOverpopulatedChunk(Chunk chunk, AtomicInteger budget) {
+        World world = chunk.getWorld();
 
-        if (ConfigManager.isDebugEnabled()) {
-            LagXpert.getInstance().getLogger().info(
-                    "[EntityCleanupTask] Scanning " + allEntities.size() + " entities in world: " + world.getName()
-            );
+        // World-aware: a nether or end template can set a stricter ceiling than the
+        // global default without affecting the overworld.
+        int configuredCeiling = ConfigManager.getMaxEntitiesPerChunk(world);
+        if (configuredCeiling <= 0) {
+            return 0; // Feature disabled.
+        }
+
+        int ceiling = AdaptiveThresholdEngine.getInstance().getEffectiveLimit(
+                AdaptiveThresholdEngine.LimitCategory.ENTITIES, configuredCeiling);
+
+        Entity[] entities;
+        try {
+            entities = chunk.getEntities();
+        } catch (Exception e) {
+            return 0;
+        }
+
+        if (entities.length <= ceiling) {
+            return 0;
+        }
+
+        int excess = entities.length - ceiling;
+        int removedHere = 0;
+
+        for (Entity entity : entities) {
+            if (removedHere >= excess || budget.get() <= 0) {
+                break;
+            }
+            // Never touch players, and honor every existing protection rule.
+            if (entity instanceof Player || shouldSkipEntity(entity)) {
+                continue;
+            }
+            try {
+                entity.remove();
+                removedHere++;
+                budget.decrementAndGet();
+            } catch (Exception e) {
+                if (ConfigManager.isDebugEnabled()) {
+                    LagXpert.getInstance().getLogger().warning(
+                            "[EntityCleanupTask] Failed to remove overflow entity: " + e.getMessage());
+                }
+            }
+        }
+
+        if (removedHere > 0) {
+            overpopulatedChunksTrimmed.incrementAndGet();
+
+            String chunkKey = world.getName() + "_" + chunk.getX() + "_" + chunk.getZ();
+            ActionLogger.getInstance().log(
+                    ActionLogger.ActionType.ENTITY_CLEANED_BULK,
+                    world.getName(),
+                    chunkKey,
+                    "Chunk over entity ceiling: " + entities.length + " > " + ceiling +
+                            (ceiling != configuredCeiling ? " (adaptive, configured " + configuredCeiling + ")" : ""),
+                    removedHere,
+                    EmergencyController.getInstance().getCurrentState() !=
+                            EmergencyController.ServerState.NORMAL ? "emergency" : "auto",
+                    true, 0);
+
+            if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info(
+                        "[EntityCleanupTask] Trimmed " + removedHere + " entities from overpopulated chunk " +
+                                chunkKey + " (was " + entities.length + ", ceiling " + ceiling + ")");
+            }
+        }
+
+        return removedHere;
+    }
+
+    /**
+     * Performs comprehensive entity cleanup for a single chunk.
+     *
+     * Chunk-scoped rather than world-scoped so the work can be dispatched to the
+     * thread that owns the chunk, which is the only form that is correct on Folia.
+     *
+     * Duplicate detection is unaffected in practice: duplicates are grouped by
+     * rounded location within the configured radius (1 block by default), so
+     * co-located entities fall in the same chunk. Only a pair straddling a chunk
+     * border can be missed, and it will be caught the next cycle if either moves.
+     *
+     * @param chunk  the chunk to clean, owned by the calling thread
+     * @param budget shared remaining-removals budget for the whole cycle
+     * @return number of entities removed from this chunk
+     */
+    private static int cleanupChunkEntities(Chunk chunk, AtomicInteger budget) {
+        int removedCount = 0;
+        List<Entity> allEntities;
+        try {
+            allEntities = new ArrayList<>(Arrays.asList(chunk.getEntities()));
+        } catch (Exception e) {
+            return 0;
+        }
+
+        if (allEntities.isEmpty()) {
+            return 0;
         }
 
         // Group entities by location for duplicate detection
@@ -191,12 +348,16 @@ public class EntityCleanupTask extends BukkitRunnable {
             }
         }
 
-        // Remove marked entities
+        // Remove marked entities, respecting the cycle-wide budget
         for (Entity entity : entitiesToRemove) {
+            if (budget.get() <= 0) {
+                break;
+            }
             try {
                 if (entity.isValid()) {
                     entity.remove();
                     removedCount++;
+                    budget.decrementAndGet();
 
                     if (ConfigManager.isDebugEnabled()) {
                         LagXpert.getInstance().getLogger().info("[EntityCleanupTask] Removed entity: " + entity.getType() + " at " + entity.getLocation());
@@ -218,7 +379,7 @@ public class EntityCleanupTask extends BukkitRunnable {
      * Determines if an entity should be skipped during cleanup.
      * FIXED: Proper protection logic with configuration support.
      */
-    private boolean shouldSkipEntity(Entity entity) {
+    private static boolean shouldSkipEntity(Entity entity) {
         // Never remove players
         if (entity instanceof Player) {
             if (ConfigManager.isDebugEnabled()) {
@@ -315,7 +476,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Checks if an entity is invalid or corrupted.
      */
-    private boolean isInvalidEntity(Entity entity) {
+    private static boolean isInvalidEntity(Entity entity) {
         try {
             // Basic validity checks
             if (!entity.isValid()) {
@@ -355,7 +516,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Checks if an entity is outside the world border.
      */
-    private boolean isOutsideWorldBorder(Entity entity) {
+    private static boolean isOutsideWorldBorder(Entity entity) {
         try {
             World world = entity.getWorld();
             if (world == null) {
@@ -380,7 +541,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Checks if a vehicle has been abandoned for too long.
      */
-    private boolean isAbandonedVehicle(Entity entity) {
+    private static boolean isAbandonedVehicle(Entity entity) {
         if (!(entity instanceof Vehicle)) {
             return false;
         }
@@ -406,7 +567,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Checks if an item frame or armor stand is empty and should be removed.
      */
-    private boolean isEmptyContainer(Entity entity) {
+    private static boolean isEmptyContainer(Entity entity) {
         if (entity instanceof ItemFrame) {
             if (!ConfigManager.shouldCleanupEmptyItemFrames()) {
                 return false;
@@ -444,7 +605,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Removes duplicate entities from a group, keeping the most appropriate one.
      */
-    private int removeDuplicateEntities(List<Entity> entities, List<Entity> entitiesToRemove) {
+    private static int removeDuplicateEntities(List<Entity> entities, List<Entity> entitiesToRemove) {
         if (entities.size() <= 1) {
             return 0;
         }
@@ -515,14 +676,14 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Helper method to check if an ItemStack is valid and not air.
      */
-    private boolean hasValidItem(ItemStack item) {
+    private static boolean hasValidItem(ItemStack item) {
         return item != null && !item.getType().isAir();
     }
 
     /**
      * Generates a location key for grouping nearby entities.
      */
-    private String getLocationKey(Location location) {
+    private static String getLocationKey(Location location) {
         if (location == null || location.getWorld() == null) {
             return "invalid";
         }
@@ -541,7 +702,7 @@ public class EntityCleanupTask extends BukkitRunnable {
     /**
      * Checks if cleanup is enabled for a specific world.
      */
-    private boolean isWorldEnabled(World world) {
+    private static boolean isWorldEnabled(World world) {
         // Check blacklisted worlds first
         List<String> blacklistedWorlds = ConfigManager.getBlacklistedWorlds();
         if (blacklistedWorlds.stream().anyMatch(w -> w.equalsIgnoreCase(world.getName()))) {
@@ -566,18 +727,21 @@ public class EntityCleanupTask extends BukkitRunnable {
         stats.put("abandoned_vehicles_removed", abandonedVehiclesRemoved.get());
         stats.put("empty_containers_removed", emptyContainersRemoved.get());
         stats.put("out_of_bounds_entities_removed", outOfBoundsEntitiesRemoved.get());
+        stats.put("overpopulated_chunks_trimmed", overpopulatedChunksTrimmed.get());
         return stats;
     }
 
     /**
-     * Runs cleanup immediately and returns the number of entities removed.
-     * Used by /lagxpert optimize and manual triggers.
+     * Runs a cleanup cycle on demand.
+     *
+     * Superseded by {@link #sweep(java.util.function.IntConsumer)}, which is what
+     * callers should use. The old {@code runImmediate()} form was removed because
+     * it measured the delta of a shared static counter around an operation that is
+     * now asynchronous, so its return value was meaningless and it double-counted
+     * anything the scheduled cycle removed concurrently.
      */
-    public static int runImmediate() {
-        EntityCleanupTask task = new EntityCleanupTask();
-        int before = totalEntitiesRemoved.get();
-        task.run();
-        return totalEntitiesRemoved.get() - before;
+    public static void runImmediate(java.util.function.IntConsumer onComplete) {
+        sweep(onComplete);
     }
 
     /**
@@ -590,5 +754,6 @@ public class EntityCleanupTask extends BukkitRunnable {
         abandonedVehiclesRemoved.set(0);
         emptyContainersRemoved.set(0);
         outOfBoundsEntitiesRemoved.set(0);
+        overpopulatedChunksTrimmed.set(0);
     }
 }

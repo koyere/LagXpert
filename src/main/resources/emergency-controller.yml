@@ -2,13 +2,17 @@
 # Reactive state machine that dynamically adjusts server limits based on
 # real-time performance metrics (TPS, memory, player count).
 #
-# Replaces the old inert LagShield with actual graduated responses.
+# Replaces the old lagshield.yml, which is no longer used or shipped.
 # Each server state applies different levels of corrective action.
 #
 # State progression: NORMAL → WARNING → CRITICAL → EMERGENCY
 #   Escalation: 3 consecutive bad readings required
 #   De-escalation: 5 consecutive good readings required
 #   Minimum 10 seconds between state changes (prevents flapping)
+#
+# NOTE: this controller only evaluates while TPS monitoring is running. If you
+# disable 'monitoring.tps.enabled' in monitoring.yml, no state changes occur and
+# the server stays in NORMAL permanently.
 
 enabled: true
 
@@ -26,12 +30,27 @@ stability:
   # Minimum time (seconds) to stay in a state before transitioning
   min-state-duration-seconds: 10
 
-  # Never go into EMERGENCY if fewer than this many players are online
+  # Never go into EMERGENCY if fewer than this many players are online.
+  # When there are fewer players than this, an EMERGENCY reading is capped
+  # at CRITICAL instead — a nearly-empty server rarely warrants extreme measures.
   min-players-for-emergency: 5
 
-# Performance thresholds that trigger state changes
+  # If the server stays continuously in CRITICAL for this many seconds, it is
+  # escalated to EMERGENCY even when the raw metrics never cross the emergency
+  # thresholds. A server pinned at 12 TPS for two minutes is an emergency in
+  # practice. Set to 0 to disable time-based escalation.
+  sustained-critical-escalate-seconds: 120
+
+# Performance thresholds that trigger state changes.
+#
+# Ordering matters. For TPS:  emergency < critical < warning <= recovery
+#                   For RAM:  recovery <= warning < critical < emergency
+# Misordered values make a tier unreachable; the plugin logs a warning on
+# startup if it detects an ordering problem.
 thresholds:
   tps:
+    # TPS below this = consider EMERGENCY (most severe)
+    emergency: 10.0
     # TPS below this = consider CRITICAL
     critical: 15.0
     # TPS below this = consider WARNING
@@ -40,6 +59,8 @@ thresholds:
     recovery: 19.0
 
   ram:
+    # RAM usage above this = consider EMERGENCY (most severe)
+    emergency: 95.0
     # RAM usage above this = consider CRITICAL
     critical: 90.0
     # RAM usage above this = consider WARNING
@@ -115,6 +136,58 @@ responses:
     #   - "save-all"
     #   - "say &c[LagXpert] Emergency optimization active - expect reduced functionality"
     emergency-commands: []
+
+# One-shot corrective actions performed on state transitions.
+# These are executed by the response coordinator, separately from the
+# continuous limit adjustments above.
+actions:
+  # Immediate off-cycle item cleanup when entering a state with
+  # 'force-item-cleanup: true'. Skips the normal countdown warning.
+  forced-item-cleanup:
+    enabled: true
+    # Minimum seconds between two forced cleanups. Prevents a flapping state
+    # from stacking cleanup sweeps on top of each other.
+    cooldown-seconds: 60
+
+  # Controls which spawns are suppressed while a state has
+  # 'block-natural-spawns: true'.
+  #
+  # Only environmental spawning pressure is listed by default. Player- and
+  # plugin-driven spawns (SPAWNER_EGG, CUSTOM, BREEDING, COMMAND, DISPENSE_EGG,
+  # BUILD_WITHER, BUILD_IRONGOLEM, ...) are deliberately absent: suppressing
+  # those makes the server look broken rather than busy.
+  #
+  # Values are CreatureSpawnEvent.SpawnReason names. Unknown names are ignored,
+  # so it is safe to keep entries that only exist on newer Minecraft versions.
+  # Players with 'lagxpert.bypass.mobs' in the chunk are always exempt.
+  block-natural-spawns:
+    spawn-reasons:
+      - NATURAL
+      - SPAWNER
+      - CHUNK_GEN
+      - REINFORCEMENTS
+      - VILLAGE_INVASION
+      - VILLAGE_DEFENSE
+      - PATROL
+      - RAID
+      - SILVERFISH_BLOCK
+      - TRAP
+      - NETHER_PORTAL
+      - JOCKEY
+      - MOUNT
+      - LIGHTNING
+      - SLIME_SPLIT
+      - DROWNED
+      - INFECTION
+      - FROZEN
+      - SPELL
+      - ENDER_PEARL
+
+  # Server-wide mob AI freeze when entering a state with 'freeze-all-ai: true'.
+  # Lifted automatically on recovery. Mobs disabled by the type/world rules in
+  # mobs.yml stay disabled when the freeze is lifted.
+  ai-freeze:
+    enabled: true
 
 # Recovery settings — when to return to NORMAL
 recovery:

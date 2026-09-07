@@ -51,6 +51,10 @@ public class PerformanceTracker extends BukkitRunnable {
     // Alert cooldown tracking
     private final Map<String, Long> alertCooldowns = new ConcurrentHashMap<>();
 
+    // Lag spike auto-mute: stops alerting after N consecutive alerts without TPS recovery
+    private volatile int consecutiveLagSpikeAlerts = 0;
+    private volatile boolean lagSpikeAlertsMuted = false;
+
     // Performance thresholds and state tracking
     private volatile PerformanceState lastTPSState = PerformanceState.GOOD;
     private volatile PerformanceState lastMemoryState = PerformanceState.GOOD;
@@ -320,14 +324,53 @@ public class PerformanceTracker extends BukkitRunnable {
 
     /**
      * Handles lag spike alerts from TPSMonitor.
+     * Auto-mutes after {LAG_SPIKE_AUTO_MUTE_AFTER} consecutive alerts without TPS recovery.
+     * Resumes alerting when TPS recovers above warning threshold.
      */
     public void handleLagSpikeAlert(TPSMonitor.LagSpike lagSpike, int consecutiveSpikes) {
+        double currentTPS = TPSMonitor.getCurrentTPS();
+
+        // Check if TPS has recovered — unmute and reset
+        if (currentTPS >= ConfigManager.getTPSWarningThreshold()) {
+            if (lagSpikeAlertsMuted) {
+                LagXpert.getInstance().getLogger().info(
+                        "[PerformanceTracker] Lag spike alerts unmuted — TPS recovered to " +
+                                String.format("%.2f", currentTPS));
+            }
+            lagSpikeAlertsMuted = false;
+            consecutiveLagSpikeAlerts = 0;
+            return;
+        }
+
+        // Auto-muted: don't send more alerts
+        if (lagSpikeAlertsMuted) {
+            return;
+        }
+
         String alertType = "lag_spike";
 
-        if (canSendAlert(alertType, ConfigManager.getLagSpikeAlertCooldown())) {
-            sendLagSpikeAlert(lagSpike, consecutiveSpikes);
-            recordAlert(alertType);
+        // Enforce cooldown between individual lag spike alerts
+        if (!canSendAlert(alertType, Math.max(ConfigManager.getLagSpikeAlertCooldown(), 60))) {
+            return;
         }
+
+        consecutiveLagSpikeAlerts++;
+
+        // Auto-mute after N consecutive alerts
+        int autoMuteAfter = ConfigManager.getLagSpikeAutoMuteAfter();
+        if (autoMuteAfter > 0 && consecutiveLagSpikeAlerts >= autoMuteAfter) {
+            lagSpikeAlertsMuted = true;
+            LagXpert.getInstance().getLogger().warning(
+                    "[PerformanceTracker] Lag spike alerts auto-muted after " +
+                            consecutiveLagSpikeAlerts + " consecutive alerts. " +
+                            "TPS is " + String.format("%.2f", currentTPS) +
+                            ". Alerts will resume when TPS recovers above " +
+                            String.format("%.2f", ConfigManager.getTPSWarningThreshold()) + ".");
+            return;
+        }
+
+        sendLagSpikeAlert(lagSpike, consecutiveSpikes);
+        recordAlert(alertType);
     }
 
     /**

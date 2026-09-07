@@ -139,20 +139,55 @@ public class VehicleManager implements Listener {
         vehicleLastInteraction.put(event.getVehicle().getUniqueId(), System.currentTimeMillis());
     }
 
+    /**
+     * Removes abandoned vehicles across every enabled world.
+     *
+     * Dispatched per chunk rather than iterating worlds inline: entity removal
+     * must happen on the thread that owns the chunk, which is the only correct
+     * form on Folia. The removal budget is shared across the whole cycle.
+     */
     private void runCleanupTask() {
         if (!enabled || !removeAbandonedVehicles) return;
 
+        java.util.List<World> targets = new java.util.ArrayList<>();
+        for (World world : Bukkit.getWorlds()) {
+            if (!isDisabledWorld(world)) {
+                targets.add(world);
+            }
+        }
+
+        java.util.concurrent.atomic.AtomicInteger budget =
+                new java.util.concurrent.atomic.AtomicInteger(Math.max(1, maxRemovalsPerCycle));
+
+        me.koyere.lagxpert.utils.RegionizedSweeper.sweep(
+                targets, "vehicle-cleanup",
+                chunk -> cleanupVehiclesInChunk(chunk, budget),
+                result -> {
+                    if (result.getTotal() > 0 && LagXpert.getInstance() != null) {
+                        LagXpert.getInstance().getLogger().info(
+                                "[VehicleManager] Cleanup complete: removed " +
+                                        result.getTotal() + " abandoned vehicles.");
+                    }
+                });
+    }
+
+    /**
+     * Removes abandoned vehicles from a single chunk.
+     *
+     * Runs on the thread that owns the chunk.
+     *
+     * @param budget shared remaining-removals budget for the whole cycle
+     * @return number of vehicles removed from this chunk
+     */
+    private int cleanupVehiclesInChunk(Chunk chunk, java.util.concurrent.atomic.AtomicInteger budget) {
         long now = System.currentTimeMillis();
+        World world = chunk.getWorld();
         int removed = 0;
 
-        for (World world : Bukkit.getWorlds()) {
-            if (isDisabledWorld(world)) continue;
-
-            for (Chunk chunk : world.getLoadedChunks()) {
-                if (removed >= maxRemovalsPerCycle) break;
-
+        {
+            {
                 for (Entity entity : chunk.getEntities()) {
-                    if (removed >= maxRemovalsPerCycle) break;
+                    if (budget.get() <= 0) break;
                     if (!(entity instanceof Vehicle)) continue;
 
                     Vehicle vehicle = (Vehicle) entity;
@@ -196,6 +231,7 @@ public class VehicleManager implements Listener {
                                 vehicle.getLocation().getBlockZ();
                         vehicle.remove();
                         removed++;
+                        budget.decrementAndGet();
 
                         ActionLogger.getInstance().log(
                                 ActionLogger.ActionType.VEHICLE_REMOVED,
@@ -215,10 +251,7 @@ public class VehicleManager implements Listener {
             }
         }
 
-        if (removed > 0 && LagXpert.getInstance() != null) {
-            LagXpert.getInstance().getLogger().info(
-                    "[VehicleManager] Cleanup complete: removed " + removed + " abandoned vehicles.");
-        }
+        return removed;
     }
 
     private boolean isDisabledWorld(World world) {

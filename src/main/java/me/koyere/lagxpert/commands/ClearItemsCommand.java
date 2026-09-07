@@ -36,7 +36,6 @@ public class ClearItemsCommand implements CommandExecutor, TabCompleter { // Imp
             return true;
         }
 
-        int totalRemoved;
         Player actor = (sender instanceof Player) ? (Player) sender : null;
 
         // Subcommand: /clearitems <world>
@@ -52,21 +51,11 @@ public class ClearItemsCommand implements CommandExecutor, TabCompleter { // Imp
                 return true;
             }
 
-            // Use the refactored static method from ItemCleanerTask, passing the actor
-            totalRemoved = ItemCleanerTask.runManualCleanupForWorld(actor, world);
-
-            // Send feedback to the command sender
-            sender.sendMessage(MessageManager.getPrefixedMessage("clearitems.removed-sender")
-                    .replace("{count}", String.valueOf(totalRemoved))
-                    .replace("{world_or_all}", world.getName()));
-
-            // Broadcast message (if items were removed)
-            if (totalRemoved > 0) {
-                Bukkit.broadcastMessage(MessageManager.getPrefixedMessage("clearitems.broadcast")
-                        .replace("{count}", String.valueOf(totalRemoved))
-                        .replace("{world_or_all}", world.getName())
-                        .replace("{player}", sender.getName())); // Add player who initiated
-            }
+            // The sweep is spread across chunks and ticks so it stays safe on Folia
+            // and does not stall a tick on large worlds. Feedback is therefore sent
+            // from the completion callback rather than immediately.
+            ItemCleanerTask.runManualCleanupForWorld(actor, world,
+                    totalRemoved -> reportManualCleanup(sender, totalRemoved, world.getName()));
             return true;
         }
 
@@ -77,27 +66,39 @@ public class ClearItemsCommand implements CommandExecutor, TabCompleter { // Imp
                 return true;
             }
 
-            // Use the refactored static method from ItemCleanerTask
-            totalRemoved = ItemCleanerTask.runManualCleanupAllWorlds(actor);
-
-            // Send feedback to the command sender
-            sender.sendMessage(MessageManager.getPrefixedMessage("clearitems.removed-sender")
-                    .replace("{count}", String.valueOf(totalRemoved))
-                    .replace("{world_or_all}", "all loaded/configured worlds"));
-
-            // Broadcast message (if items were removed)
-            if (totalRemoved > 0) {
-                Bukkit.broadcastMessage(MessageManager.getPrefixedMessage("clearitems.broadcast")
-                        .replace("{count}", String.valueOf(totalRemoved))
-                        .replace("{world_or_all}", "all") // Using "all" for broadcast clarity
-                        .replace("{player}", sender.getName())); // Add player who initiated
-            }
+            ItemCleanerTask.runManualCleanupAllWorlds(actor,
+                    totalRemoved -> reportManualCleanup(sender, totalRemoved, "all"));
             return true;
         }
 
         // If arguments are provided but don't match known subcommands
         sender.sendMessage(MessageManager.getPrefixedMessage("clearitems.usage")); // Suggest a usage message key
         return true;
+    }
+
+    /**
+     * Sends the result of a completed manual cleanup to the sender and, when
+     * anything was removed, to the server.
+     *
+     * Runs on the main thread once the sweep has finished. The sender is checked
+     * for validity because a player can disconnect while a large sweep is still
+     * in progress.
+     */
+    private void reportManualCleanup(CommandSender sender, int totalRemoved, String scope) {
+        boolean senderStillPresent = !(sender instanceof Player) || ((Player) sender).isOnline();
+
+        if (senderStillPresent) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("clearitems.removed-sender")
+                    .replace("{count}", String.valueOf(totalRemoved))
+                    .replace("{world_or_all}", scope));
+        }
+
+        if (totalRemoved > 0) {
+            Bukkit.broadcastMessage(MessageManager.getPrefixedMessage("clearitems.broadcast")
+                    .replace("{count}", String.valueOf(totalRemoved))
+                    .replace("{world_or_all}", scope)
+                    .replace("{player}", sender.getName()));
+        }
     }
 
     @Override

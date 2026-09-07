@@ -163,7 +163,7 @@ public class ConfigGUI implements Listener {
         );
         gui.setItem(22, saveClose);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "main_menu");
 
         // Initialize pending changes map for this player
@@ -243,7 +243,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "entity_limits");
     }
 
@@ -326,7 +326,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 45);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "block_limits");
     }
 
@@ -379,7 +379,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "redstone_settings");
     }
 
@@ -430,7 +430,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "cleanup_settings");
     }
 
@@ -483,7 +483,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "alert_config");
     }
 
@@ -550,7 +550,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "performance_monitor");
     }
 
@@ -601,7 +601,7 @@ public class ConfigGUI implements Listener {
         addBackButton(gui, 18);
         addBorders(gui);
 
-        player.openInventory(gui);
+        me.koyere.lagxpert.utils.BedrockUI.adaptAndOpen(player, gui);
         openGUIs.put(player.getUniqueId(), "advanced_settings");
     }
 

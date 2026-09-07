@@ -21,7 +21,7 @@ import java.util.Map;
 public class LagXpertGUICommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = Arrays.asList(
-            "open", "close", "reload", "sessions", "help"
+            "open", "diagnostics", "close", "reload", "sessions", "help"
     );
 
     @Override
@@ -50,6 +50,11 @@ public class LagXpertGUICommand implements CommandExecutor, TabCompleter {
         switch (subcommand) {
             case "open":
                 return handleOpenCommand(player);
+            case "diagnostics":
+            case "diagnose":
+                // Permission is checked inside openDiagnosticsGUI.
+                GUIManager.getInstance().openDiagnosticsGUI(player, false);
+                return true;
             case "close":
                 return handleCloseCommand(player);
             case "reload":

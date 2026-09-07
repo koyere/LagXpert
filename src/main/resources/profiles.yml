@@ -1,10 +1,40 @@
 # Optimization Profiles
 # Pre-configured optimization presets for different server scenarios.
-# Apply with: /lagxpert profile <name>
-# Auto-reverts after 10 minutes if admin disconnects (safety feature).
 #
-# Each profile overrides specific config values when applied.
-# Missing keys use the current config defaults.
+#   /lagxpert profile list       — show available profiles and which is active
+#   /lagxpert profile <name>     — apply a profile
+#   /lagxpert profile revert     — restore the configuration from before the
+#                                  first profile was applied
+#
+# HOW THIS WORKS
+# Applying a profile writes the values below into the real config files
+# (mobs.yml, storage.yml, chunks.yml, ...), saves them to disk, and reloads
+# every subsystem. The change is therefore permanent until you revert it or
+# the auto-revert timer fires.
+#
+# Before the first write, the values being replaced are snapshotted in memory.
+# 'revert' restores that exact snapshot, so you get your own configuration back
+# rather than some assumed default. Applying a second profile on top of a first
+# keeps the original snapshot, so revert always returns all the way to where
+# you started.
+#
+# Any key you add that is not in the recognised list below is reported in the
+# console and ignored rather than silently dropped. The recognised keys are:
+#
+#   limits.mobs-per-chunk              limits.shulker_boxes-per-chunk
+#   limits.hoppers-per-chunk           limits.tnt-per-chunk
+#   limits.chests-per-chunk            limits.pistons-per-chunk
+#   limits.furnaces-per-chunk          limits.observers-per-chunk
+#   limits.barrels-per-chunk
+#   limits.droppers-per-chunk          item-cleaner.interval-ticks
+#   limits.dispensers-per-chunk
+#                                      chunks.unload-inactivity-minutes
+#   mobs.ai-optimizer-enabled          chunks.preload-radius
+#   mobs.ai-distance-threshold
+#                                      redstone.active-ticks
+#   adaptive-thresholds.enabled        redstone.clock-max-duration-ms
+#                                      redstone.clock-grace-period-ms
+#   entity-cleanup.max-entities-per-chunk
 
 profiles:
   # Good for small servers (< 20 players) — minimal restrictions
@@ -22,6 +52,8 @@ profiles:
     mobs:
       ai-optimizer-enabled: true
       ai-distance-threshold: 64
+    entity-cleanup:
+      max-entities-per-chunk: 300
 
   # Default balanced profile — good for most servers
   balanced:
@@ -38,6 +70,8 @@ profiles:
     mobs:
       ai-optimizer-enabled: true
       ai-distance-threshold: 64
+    entity-cleanup:
+      max-entities-per-chunk: 200
 
   # For large servers (> 50 players) or low-end hardware
   aggressive:
@@ -57,10 +91,12 @@ profiles:
       ai-distance-threshold: 48
     adaptive-thresholds:
       enabled: true
+    entity-cleanup:
+      max-entities-per-chunk: 120
 
   # Maximum optimization — may impact gameplay, use for events or crisis
   performance:
-    description: "Maximum performance — use during events or heavy load"
+    description: "Maximum performance - use during events or heavy load"
     limits:
       mobs-per-chunk: 15
       hoppers-per-chunk: 3
@@ -77,13 +113,20 @@ profiles:
     adaptive-thresholds:
       enabled: true
     redstone:
-      disable-clocks: true
+      active-ticks: 40             # cut wires after 2s instead of 5s
+      clock-max-duration-ms: 2000  # shut clocks down after 2s
+      clock-grace-period-ms: 3000  # shorter warning before cutting
+    entity-cleanup:
+      max-entities-per-chunk: 80
 
 # Safety settings
 safety:
-  # Auto-revert profile to 'balanced' after this many minutes
-  # Set to 0 to disable auto-revert
+  # Restore the pre-profile configuration automatically after this many minutes.
+  # This is a guard against applying an aggressive profile during an incident and
+  # then forgetting about it. Re-applying a profile restarts the timer.
+  # Set to 0 to disable auto-revert and keep a profile until you revert manually.
   auto-revert-minutes: 10
 
-  # Permission required to switch profiles
+  # Permission required to list, apply and revert profiles.
+  # Holders of 'lagxpert.admin' always qualify.
   permission: "lagxpert.admin.profile"

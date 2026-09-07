@@ -40,6 +40,15 @@ public class MobAIOptimizer {
     }
 
     public void reloadConfig() {
+        // Always initialize the collections first. Returning early with null sets
+        // would make every later lookup throw a NullPointerException.
+        if (this.disabledAiTypes == null) {
+            this.disabledAiTypes = new HashSet<>();
+        }
+        if (this.disabledAiWorlds == null) {
+            this.disabledAiWorlds = new HashSet<>();
+        }
+
         File mobsFile = new File(LagXpert.getInstance().getDataFolder(), "mobs.yml");
         if (!mobsFile.exists()) {
             return;
@@ -62,6 +71,51 @@ public class MobAIOptimizer {
 
         this.distanceOptimizationEnabled = config.getBoolean("ai-optimizer.distance-optimization.enabled", true);
         this.distanceThreshold = config.getInt("ai-optimizer.distance-optimization.distance-threshold", 64);
+    }
+
+    /**
+     * Returns the operator-configured AI distance threshold from mobs.yml,
+     * ignoring any emergency-state tightening.
+     */
+    public int getConfiguredDistanceThreshold() {
+        return distanceThreshold;
+    }
+
+    /**
+     * Returns the distance threshold actually in force right now.
+     *
+     * The EmergencyController only ever tightens this value: when the server is
+     * degraded it may lower the radius, but it must never widen it beyond what
+     * the operator configured in mobs.yml. When the controller is disabled or in
+     * NORMAL state, the configured value is used verbatim.
+     */
+    public int getEffectiveDistanceThreshold() {
+        EmergencyController controller = EmergencyController.getInstance();
+        if (!controller.isEnabled()
+                || controller.getCurrentState() == EmergencyController.ServerState.NORMAL) {
+            return distanceThreshold;
+        }
+        // Tighten only — never widen past the operator's configured radius.
+        return Math.min(distanceThreshold, controller.getAIDistanceThreshold());
+    }
+
+    /**
+     * Returns true when this entity's AI is disabled unconditionally by the
+     * type/world rules in mobs.yml, independent of distance or server state.
+     *
+     * Used when lifting an emergency AI freeze so that mobs the operator
+     * deliberately froze by configuration are not silently re-animated.
+     */
+    public boolean isAiDisabledByConfig(LivingEntity entity) {
+        if (entity == null) {
+            return false;
+        }
+        if (disabledAiWorlds != null
+                && disabledAiWorlds.contains(entity.getWorld().getName().toLowerCase())) {
+            return true;
+        }
+        return disabledAiTypes != null
+                && disabledAiTypes.contains(entity.getType().name().toUpperCase());
     }
 
     /**
@@ -105,8 +159,8 @@ public class MobAIOptimizer {
         if (!entity.isValid())
             return;
 
-        // Use EmergencyController's dynamic distance threshold when active
-        int effectiveDistanceThreshold = EmergencyController.getInstance().getAIDistanceThreshold();
+        // Honors mobs.yml by default; the EmergencyController may only tighten it.
+        int effectiveDistanceThreshold = getEffectiveDistanceThreshold();
 
         // If explicitly disabled by type/world, keep it disabled
         if (disabledAiTypes.contains(entity.getType().name().toUpperCase()) ||

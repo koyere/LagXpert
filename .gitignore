@@ -40,3 +40,4 @@ build/
 ### Claude Code ###
 .claude/
 CLAUDE.md
+overview.md

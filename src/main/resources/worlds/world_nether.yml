@@ -3,23 +3,43 @@
 # Only include settings you want to override - missing settings will use global defaults.
 # You can copy any setting from the main config files (mobs.yml, storage.yml, etc.) here.
 #
-# Example overrides:
+# Supported overrides (anything else here is ignored):
+#
 # limits:
-#   mobs-per-chunk: 30        # Override global mob limit
-#   hoppers-per-chunk: 5      # Override global hopper limit
+#   mobs-per-chunk, hoppers-per-chunk, chests-per-chunk, furnaces-per-chunk,
+#   blast_furnaces-per-chunk, smokers-per-chunk, barrels-per-chunk,
+#   droppers-per-chunk, dispensers-per-chunk, shulker_boxes-per-chunk,
+#   tnt-per-chunk, pistons-per-chunk, observers-per-chunk
+#
+# entity-cleanup:
+#   advanced:
+#     max-entities-per-chunk   # total entity ceiling for this world
+#
+# chunk-management:
+#   auto-unload:
+#     inactivity-threshold-minutes
+#   preload:
+#     enabled
 #
 # monitoring:
 #   tps:
 #     alert-thresholds:
-#       warning: 16.0         # Different TPS warning for this world
+#       warning, critical
 #
 # Remove or comment out sections you don't want to override.
+#
+# Note: per-world overrides require 'per-world-settings.enabled: true' in
+# config.yml. All these values are still scaled down automatically by the
+# adaptive threshold engine when the server is under load.
+
+# IMPORTANT: a limit of 0 (or any negative number) means "no limit at all",
+# not "ban this block". To restrict something tightly, use 1.
 
 # Nether-specific overrides - lower limits due to hostile environment
 limits:
   mobs-per-chunk: 25
   hoppers-per-chunk: 6
-  tnt-per-chunk: 0 # No TNT in nether by default
+  tnt-per-chunk: 1 # Very strict; use 0 for unlimited
 
 # More aggressive entity cleanup in nether
 entity-cleanup:

@@ -4,6 +4,7 @@ import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.cache.ChunkDataCache;
 import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.AlertCooldownManager;
 import me.koyere.lagxpert.system.SmartMobManager;
 import me.koyere.lagxpert.utils.ChunkUtils;
@@ -60,6 +61,25 @@ public class AutoChunkScanTask extends BukkitRunnable {
             this(translationKey, displayName, null, limitFunction, overloadCauseSuffix, CounterType.LIVING_ENTITY, nearLimitToggle);
         }
 
+        /**
+         * Maps this element to the adaptive sensitivity profile that governs it.
+         *
+         * Mob counts follow the MOBS profile; redstone components follow REDSTONE
+         * so operators can tune how aggressively contraptions get throttled;
+         * everything else is storage.
+         */
+        public AdaptiveThresholdEngine.LimitCategory getAdaptiveCategory() {
+            switch (overloadCauseSuffix) {
+                case "mobs":
+                    return AdaptiveThresholdEngine.LimitCategory.MOBS;
+                case "observers":
+                case "pistons":
+                    return AdaptiveThresholdEngine.LimitCategory.REDSTONE;
+                default:
+                    return AdaptiveThresholdEngine.LimitCategory.STORAGE;
+            }
+        }
+
         /** Returns the translated display name from messages.yml, falling back to the hardcoded default. */
         public String getDisplayName() { return MessageManager.getTranslation(translationKey, displayName); }
         public String getTranslationKey() { return translationKey; }
@@ -91,10 +111,10 @@ public class AutoChunkScanTask extends BukkitRunnable {
         elementsToScan.add(new ScannableElement("droppers", "Droppers", Material.DROPPER, chunk -> ConfigManager.getMaxDroppersPerChunk(chunk.getWorld()), "droppers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDroppersNearLimit));
         elementsToScan.add(new ScannableElement("dispensers", "Dispensers", Material.DISPENSER, chunk -> ConfigManager.getMaxDispensersPerChunk(chunk.getWorld()), "dispensers", CounterType.TILE_ENTITY, ConfigManager::shouldWarnOnDispensersNearLimit));
         elementsToScan.add(new ScannableElement("shulker_boxes", "Shulker Boxes", Material.SHULKER_BOX, chunk -> ConfigManager.getMaxShulkerBoxesPerChunk(chunk.getWorld()), "shulker_boxes", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnShulkerBoxesNearLimit));
-        elementsToScan.add(new ScannableElement("tnt", "TNT", Material.TNT, chunk -> ConfigManager.getMaxTntPerChunk(), "tnt", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnTntNearLimit));
+        elementsToScan.add(new ScannableElement("tnt", "TNT", Material.TNT, chunk -> ConfigManager.getMaxTntPerChunk(chunk.getWorld()), "tnt", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnTntNearLimit));
         // Pistons and Sticky Pistons unified into a single entry to avoid duplicate statistics
-        elementsToScan.add(new ScannableElement("pistons", "Pistons", Material.PISTON, chunk -> ConfigManager.getMaxPistonsPerChunk(), "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
-        elementsToScan.add(new ScannableElement("observers", "Observers", Material.OBSERVER, chunk -> ConfigManager.getMaxObserversPerChunk(), "observers", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnObserversNearLimit));
+        elementsToScan.add(new ScannableElement("pistons", "Pistons", Material.PISTON, chunk -> ConfigManager.getMaxPistonsPerChunk(chunk.getWorld()), "pistons", CounterType.CUSTOM_COUNT, ConfigManager::shouldWarnOnPistonsNearLimit));
+        elementsToScan.add(new ScannableElement("observers", "Observers", Material.OBSERVER, chunk -> ConfigManager.getMaxObserversPerChunk(chunk.getWorld()), "observers", CounterType.BLOCK_ITERATION, ConfigManager::shouldWarnOnObserversNearLimit));
     }
 
     @Override
@@ -143,7 +163,13 @@ public class AutoChunkScanTask extends BukkitRunnable {
 
                 for (ScannableElement element : elementsToScan) {
                     int count = getElementCount(currentChunk, element, chunkData);
-                    int limit = element.getLimit(currentChunk);
+
+                    // Scale the configured limit the same way the placement and spawn
+                    // listeners do, so a chunk flagged as overloaded here matches what
+                    // players are actually being restricted to right now.
+                    int limit = AdaptiveThresholdEngine.getInstance().getEffectiveLimit(
+                            element.getAdaptiveCategory(),
+                            element.getLimit(currentChunk));
 
                     if (limit <= 0) continue;
 

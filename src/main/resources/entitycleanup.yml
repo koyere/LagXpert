@@ -57,7 +57,21 @@ entity-cleanup:
 
   # Advanced cleanup settings
   advanced:
-    # Maximum entities per chunk before triggering aggressive cleanup
+    # Maximum total entities allowed in a single chunk.
+    #
+    # The other cleanup rules above only remove entities that are individually
+    # defective. This ceiling handles the different problem of a chunk stuffed
+    # with thousands of perfectly valid entities: any excess above this number
+    # is trimmed during the cleanup cycle.
+    #
+    # Protected entities (named, tamed, leashed, ridden, persistent,
+    # plugin-created, villagers with trades, and the protected types listed
+    # above) are never removed, so a chunk legitimately full of protected
+    # entities is left alone.
+    #
+    # This value is scaled down automatically by the 'entities' sensitivity in
+    # config.yml -> adaptive-thresholds when the server is under load.
+    # Set to 0 to disable the per-chunk ceiling entirely.
     max-entities-per-chunk: 200
 
     # Radius (in blocks) to check for duplicate entities

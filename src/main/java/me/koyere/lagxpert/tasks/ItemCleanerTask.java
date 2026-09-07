@@ -32,32 +32,53 @@ public class ItemCleanerTask extends BukkitRunnable {
 
     @Override
     public void run() {
-        // This 'run' method is called periodically by the Bukkit scheduler.
-        // It will handle the warning and then trigger the actual cleanup.
-
-        // Use the master module toggle from config.yml
         if (!ConfigManager.isItemCleanerModuleEnabled()) {
             return;
+        }
+
+        List<String> enabledWorlds = ConfigManager.getItemCleanerEnabledWorlds();
+        boolean hasPlayersInEnabledWorlds = false;
+
+        // Check if any enabled world has players before broadcasting
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            World playerWorld = player.getWorld();
+            boolean worldEnabled = enabledWorlds.stream().anyMatch(
+                    w -> w.equalsIgnoreCase("all") || w.equalsIgnoreCase(playerWorld.getName()));
+            if (worldEnabled) {
+                hasPlayersInEnabledWorlds = true;
+                break;
+            }
         }
 
         if (ConfigManager.isItemCleanerWarningEnabled()) {
             int warningSeconds = ConfigManager.getItemCleanerWarningTimeSeconds();
             String warningMessageTemplate = ConfigManager.getItemCleanerWarningMessage();
-
             String messageContent = warningMessageTemplate.replace("{seconds}", String.valueOf(warningSeconds));
-            Bukkit.broadcastMessage(MessageManager.color(messageContent));
+            String coloredMessage = MessageManager.color(messageContent);
+
+            if (hasPlayersInEnabledWorlds) {
+                // Only warn players in worlds where cleanup will actually happen
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    World playerWorld = player.getWorld();
+                    boolean worldEnabled = enabledWorlds.stream().anyMatch(
+                            w -> w.equalsIgnoreCase("all") || w.equalsIgnoreCase(playerWorld.getName()));
+                    if (worldEnabled) {
+                        player.sendMessage(coloredMessage);
+                    }
+                }
+            } else if (ConfigManager.isDebugEnabled()) {
+                LagXpert.getInstance().getLogger().info(
+                        "[ItemCleanerTask] Skipping warning broadcast — no players in enabled worlds.");
+            }
 
             // Schedule the actual cleanup to run after the warning period.
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    performCleanupForAllWorlds(null); // 'null' actor signifies automatic cleanup
-                }
-            }.runTaskLater(LagXpert.getInstance(), warningSeconds * 20L); // Convert seconds to ticks
+            me.koyere.lagxpert.utils.SchedulerWrapper.runTaskLater(
+                    () -> performCleanupForAllWorlds(null, false, null),
+                    warningSeconds * 20L);
 
         } else {
             // No warning configured, perform cleanup immediately.
-            performCleanupForAllWorlds(null);
+            performCleanupForAllWorlds(null, false, null);
         }
     }
 
@@ -68,56 +89,95 @@ public class ItemCleanerTask extends BukkitRunnable {
      * @param actor The player who initiated the cleanup, or null if automatic.
      * @return The total number of items removed.
      */
-    private static int performCleanupForAllWorlds(Player actor) {
-        int totalItemsRemoved = 0;
+    private static void performCleanupForAllWorlds(Player actor,
+                                                   boolean suppressReporting,
+                                                   java.util.function.IntConsumer onComplete) {
         List<String> enabledWorlds = ConfigManager.getItemCleanerEnabledWorlds();
 
         if (ConfigManager.isDebugEnabled() && actor == null) {
             LagXpert.getInstance().getLogger().info("[LagXpert] ItemCleanerTask: Starting automatic cleanup cycle.");
         }
 
+        List<World> targets = new java.util.ArrayList<>();
         for (World world : Bukkit.getWorlds()) {
-            boolean isWorldEnabled = enabledWorlds.stream().anyMatch(w -> w.equalsIgnoreCase("all") || w.equalsIgnoreCase(world.getName()));
+            boolean isWorldEnabled = enabledWorlds.stream().anyMatch(
+                    w -> w.equalsIgnoreCase("all") || w.equalsIgnoreCase(world.getName()));
             if (isWorldEnabled) {
-                totalItemsRemoved += clearItemsFromSpecificWorld(world, actor);
+                targets.add(world);
             }
         }
 
-        if (totalItemsRemoved > 0 && actor == null) { // Broadcast only for automatic cleanup
+        // Swept per chunk rather than per world. A whole-world entity query cannot
+        // be performed safely on Folia, where each region owns its own chunks.
+        me.koyere.lagxpert.utils.RegionizedSweeper.sweep(
+                targets, "item-cleanup",
+                chunk -> clearItemsFromChunk(chunk, actor),
+                result -> reportCleanupResult(result.getTotal(), actor, suppressReporting, onComplete));
+    }
+
+    /**
+     * Broadcasts, records and reports the outcome of a completed sweep.
+     *
+     * Split out because the sweep is asynchronous: this runs on the main thread
+     * once every chunk has been visited.
+     */
+    private static void reportCleanupResult(int totalItemsRemoved, Player actor,
+                                            boolean suppressReporting,
+                                            java.util.function.IntConsumer onComplete) {
+        List<String> enabledWorlds = ConfigManager.getItemCleanerEnabledWorlds();
+
+        if (totalItemsRemoved > 0 && actor == null && !suppressReporting) {
             String cleanedMessageTemplate = ConfigManager.getItemCleanerCleanedMessage();
             String messageContent = cleanedMessageTemplate.replace("{count}", String.valueOf(totalItemsRemoved));
-            Bukkit.broadcastMessage(MessageManager.color(messageContent));
+            String coloredMessage = MessageManager.color(messageContent);
+
+            // Only broadcast to players in enabled worlds
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                boolean worldEnabled = enabledWorlds.stream().anyMatch(
+                        w -> w.equalsIgnoreCase("all") || w.equalsIgnoreCase(p.getWorld().getName()));
+                if (worldEnabled) {
+                    p.sendMessage(coloredMessage);
+                }
+            }
         }
 
         if (totalItemsRemoved > 0) {
             AbyssTracker.itemAddedToAbyss(totalItemsRemoved);
 
-            // Log corrective action to audit trail
-            String triggeredBy = EmergencyController.getInstance().getCurrentState() !=
-                    EmergencyController.ServerState.NORMAL ? "emergency" : "auto";
-            ActionLogger.getInstance().log(
-                    ActionLogger.ActionType.ITEM_CLEARED_BULK,
-                    null, null,
-                    "Automatic cleanup cycle",
-                    totalItemsRemoved, triggeredBy, true, 0);
+            // Log corrective action to audit trail. Skipped during a forced run,
+            // where the caller records a more detailed entry itself.
+            if (!suppressReporting) {
+                String triggeredBy = EmergencyController.getInstance().getCurrentState() !=
+                        EmergencyController.ServerState.NORMAL ? "emergency" : "auto";
+                ActionLogger.getInstance().log(
+                        ActionLogger.ActionType.ITEM_CLEARED_BULK,
+                        null, null,
+                        "Automatic cleanup cycle",
+                        totalItemsRemoved, triggeredBy, true, 0);
+            }
         }
 
         if (ConfigManager.isDebugEnabled() && actor == null && totalItemsRemoved > 0) {
             LagXpert.getInstance().getLogger().info("[LagXpert] ItemCleanerTask: Automatic cleanup finished. Removed " + totalItemsRemoved + " items.");
         }
 
-        return totalItemsRemoved;
+        if (onComplete != null) {
+            onComplete.accept(totalItemsRemoved);
+        }
     }
 
     /**
-     * Clears items from a specific world based on current configuration.
-     * Fixed to properly handle excluded items.
+     * Clears dropped items from a single chunk.
      *
-     * @param world The world to clear items from.
+     * Chunk-scoped rather than world-scoped so the work can be dispatched to the
+     * thread that owns the chunk, which is the only form that is correct on Folia.
+     * Called from {@link me.koyere.lagxpert.utils.RegionizedSweeper}.
+     *
+     * @param chunk The chunk to clear items from.
      * @param actor The player who initiated the cleanup (for Abyss context), or null if automatic.
-     * @return The number of items removed from this world.
+     * @return The number of items removed from this chunk.
      */
-    private static int clearItemsFromSpecificWorld(World world, Player actor) {
+    private static int clearItemsFromChunk(org.bukkit.Chunk chunk, Player actor) {
         int itemsRemovedInWorld = 0;
 
         // Get excluded items and convert to uppercase for case-insensitive comparison
@@ -125,11 +185,11 @@ public class ItemCleanerTask extends BukkitRunnable {
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
 
-        if (ConfigManager.isDebugEnabled()) {
-            LagXpert.getInstance().getLogger().info("[ItemCleanerTask] Excluded items: " + excludedItemsUpper);
-        }
-
-        for (Item itemEntity : world.getEntitiesByClass(Item.class)) {
+        for (org.bukkit.entity.Entity entity : chunk.getEntities()) {
+            if (!(entity instanceof Item)) {
+                continue;
+            }
+            Item itemEntity = (Item) entity;
             try {
                 ItemStack itemStack = itemEntity.getItemStack();
 
@@ -240,34 +300,75 @@ public class ItemCleanerTask extends BukkitRunnable {
      * Manually triggers item cleanup for all configured worlds.
      * Intended for use by commands (e.g., /clearitems all).
      *
-     * @param actor The player executing the command, can be null if run from console.
-     * @return The total number of items removed.
+     * The sweep is spread across chunks and ticks, so the total is delivered
+     * through the callback rather than returned.
+     *
+     * @param actor      The player executing the command, or null for console.
+     * @param onComplete Receives the total removed, on the main thread. May be null.
      */
-    public static int runManualCleanupAllWorlds(Player actor) {
+    public static void runManualCleanupAllWorlds(Player actor,
+                                                 java.util.function.IntConsumer onComplete) {
         String actorName = (actor == null) ? "CONSOLE" : actor.getName();
         LagXpert.getInstance().getLogger().info("[LagXpert] Manual cleanup of all worlds initiated by " + actorName);
-        return performCleanupForAllWorlds(actor);
+
+        // Manual runs report to the actor, so the automatic broadcast and the
+        // routine audit entry are suppressed to avoid duplicate messaging.
+        performCleanupForAllWorlds(actor, actor != null, onComplete);
+    }
+
+    /**
+     * Runs an immediate cleanup outside the normal schedule, skipping the
+     * countdown warning.
+     *
+     * Used by the EmergencyResponseCoordinator when the server state requests a
+     * forced cleanup. The countdown is intentionally skipped: announcing a
+     * ten-second warning while the server is already critical defeats the point.
+     *
+     * Callers are responsible for cooldown and re-entrancy control; this method
+     * additionally suppresses the "cleaned {count}" broadcast so an emergency
+     * sweep does not spam chat on top of the state-change alert.
+     *
+     * @param reason     Free-form reason recorded in the log line.
+     * @param onComplete Receives the total removed, on the main thread. May be null.
+     */
+    public static void runForcedCleanup(String reason,
+                                        java.util.function.IntConsumer onComplete) {
+        LagXpert.getInstance().getLogger().info(
+                "[ItemCleanerTask] Forced cleanup triggered (" + reason + ").");
+
+        performCleanupForAllWorlds(null, true, onComplete);
     }
 
     /**
      * Manually triggers item cleanup for a specific world.
-     * Intended for use by commands (e.g., /clearitems <world_name>).
+     * Intended for use by commands (e.g., /clearitems &lt;world_name&gt;).
      *
-     * @param actor The player executing the command, can be null if run from console.
-     * @param world The specific world to clean items from.
-     * @return The number of items removed from the specified world.
+     * @param actor      The player executing the command, or null for console.
+     * @param world      The specific world to clean items from.
+     * @param onComplete Receives the total removed, on the main thread. May be null.
      */
-    public static int runManualCleanupForWorld(Player actor, World world) {
+    public static void runManualCleanupForWorld(Player actor, World world,
+                                                java.util.function.IntConsumer onComplete) {
         if (world == null) {
-            return 0;
+            if (onComplete != null) {
+                onComplete.accept(0);
+            }
+            return;
         }
         String actorName = (actor == null) ? "CONSOLE" : actor.getName();
         LagXpert.getInstance().getLogger().info("[LagXpert] Manual cleanup of world '" + world.getName() + "' initiated by " + actorName);
 
-        int itemsRemoved = clearItemsFromSpecificWorld(world, actor);
-        if (itemsRemoved > 0) {
-            AbyssTracker.itemAddedToAbyss(itemsRemoved);
-        }
-        return itemsRemoved;
+        me.koyere.lagxpert.utils.RegionizedSweeper.sweep(
+                java.util.Collections.singletonList(world), "item-cleanup:" + world.getName(),
+                chunk -> clearItemsFromChunk(chunk, actor),
+                result -> {
+                    int itemsRemoved = result.getTotal();
+                    if (itemsRemoved > 0) {
+                        AbyssTracker.itemAddedToAbyss(itemsRemoved);
+                    }
+                    if (onComplete != null) {
+                        onComplete.accept(itemsRemoved);
+                    }
+                });
     }
 }

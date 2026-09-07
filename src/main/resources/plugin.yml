@@ -10,9 +10,18 @@ author: Koyere
 authors: [Koyere]
 website: https://www.spigotmc.org/resources/lagxpert-free.124725/
 
-# Optional: Soft dependencies - plugin will load without them but integrates if present.
-# softdepend:
-#  - PlaceholderAPI
+# Declares support for Folia's regionised threading. Without this key Folia
+# refuses to load the plugin entirely, regardless of how the code is written.
+folia-supported: true
+
+# Soft dependencies - the plugin loads without them but integrates if present.
+# Geyser and Floodgate are declared so they initialise before LagXpert does,
+# which is what allows Bedrock player detection to work on the first join
+# rather than only after a reconnect.
+softdepend:
+  - Geyser-Spigot
+  - floodgate
+  - PlaceholderAPI
 
 # ----------------------------------------------
 #  Commands
@@ -20,14 +29,14 @@ website: https://www.spigotmc.org/resources/lagxpert-free.124725/
 commands:
   lagxpert:
     description: Main command for LagXpert. Accesses subcommands and help.
-    usage: "/lagxpert <help|reload|inspect|chunkload>"
+    usage: "/lagxpert <help|reload|status|diagnose|optimize|emergency|profile|inspect>"
     aliases: [lx, lagx]
     permission: lagxpert.use
     permission-message: "You do not have permission to use this command."
 
   lagxpertgui:
     description: Opens the interactive GUI configuration interface for LagXpert.
-    usage: "/lagxpertgui [open|close|reload|sessions|help]"
+    usage: "/lagxpertgui [open|diagnostics|close|reload|sessions|help]"
     aliases: [lxgui, lagxgui]
     permission: lagxpert.gui
     permission-message: "You do not have permission to use the GUI interface."
@@ -70,7 +79,40 @@ permissions:
     description: Allows usage of the /chunkstatus command.
     default: true
   lagxpert.admin:
-    description: Grants access to LagXpert administrative commands (reload, inspect).
+    description: Grants access to all LagXpert administrative commands. Implies every lagxpert.admin.* node below.
+    default: op
+    children:
+      lagxpert.admin.status: true
+      lagxpert.admin.diagnostics: true
+      lagxpert.admin.optimize: true
+      lagxpert.admin.emergency: true
+      lagxpert.admin.profile: true
+
+  # Fine-grained administrative nodes.
+  # Grant these individually to give a limited admin exactly one capability
+  # without handing over the whole lagxpert.admin node.
+  lagxpert.admin.status:
+    description: Allows /lagxpert status (read-only performance dashboard).
+    default: op
+  lagxpert.admin.diagnostics:
+    description: Allows /lagxpert diagnose and the diagnostics GUI (read-only lag analysis).
+    default: op
+    children:
+      lagxpert.admin.diagnostics.teleport: true
+  lagxpert.admin.diagnostics.teleport:
+    description: Allows teleporting directly to a problem chunk from the diagnostics GUI.
+    default: op
+  lagxpert.admin.optimize:
+    description: Allows /lagxpert optimize, which removes entities and unloads chunks.
+    default: op
+  lagxpert.admin.emergency:
+    description: Allows /lagxpert emergency, including force-normal to clear an emergency state.
+    default: op
+  lagxpert.admin.profile:
+    description: Allows /lagxpert profile, which rewrites configuration files.
+    default: op
+  lagxpert.emergency.notify:
+    description: Receives broadcast notifications when the server changes emergency state.
     default: op
   lagxpert.abyss:
     description: Allows players to use /abyss to recover cleared items.
@@ -90,6 +132,12 @@ permissions:
   lagxpert.monitoring.alerts:
     description: Allows receiving monitoring alerts for performance issues.
     default: op
+  lagxpert.notifications.mob-removal:
+    description: Receives notifications when the smart mob manager removes mobs nearby.
+    default: false
+  lagxpert.console.view-filtered:
+    description: Receives console messages that the console filter suppressed, forwarded in chat.
+    default: false
 
   # GUI System Permissions
   lagxpert.gui:
@@ -124,10 +172,14 @@ permissions:
       lagxpert.bypass.tnt: true
       lagxpert.bypass.pistons: true
       lagxpert.bypass.observers: true
+      lagxpert.bypass.abilities: true
 
   # Individual Bypass Permissions
   lagxpert.bypass.mobs:
-    description: Exempts from mob spawn limits.
+    description: Exempts from mob spawn limits, and from emergency natural spawn blocking.
+    default: false
+  lagxpert.bypass.abilities:
+    description: Exempts from Elytra speed limits and Trident riptide cooldowns.
     default: false
   lagxpert.bypass.redstone:
     description: Exempts from redstone control actions.

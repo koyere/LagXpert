@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Emergency Controller — reactive state machine that replaces the inert LagShield.
+ * Emergency Controller — reactive state machine governing server health responses.
  *
  * Evaluates server health metrics (TPS, memory, player count) on every tick
  * and transitions between states: NORMAL, WARNING, CRITICAL, EMERGENCY.
@@ -74,13 +74,57 @@ public class EmergencyController {
     private boolean allowForceNormal;
     private List<String> emergencyCommands;
 
+    /**
+     * Spawn reasons considered "environmental" and therefore eligible for
+     * suppression while {@link #shouldBlockNaturalSpawns()} is active.
+     *
+     * Stored as upper-case enum names so the set stays valid across the whole
+     * 1.16 to 1.21 range without referencing constants that may not exist.
+     */
+    private final java.util.Set<String> blockedSpawnReasons =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Default environmental spawn reasons, used when the config omits the list. */
+    private static final List<String> DEFAULT_BLOCKED_SPAWN_REASONS = java.util.Arrays.asList(
+            "NATURAL",
+            "SPAWNER",
+            "CHUNK_GEN",
+            "REINFORCEMENTS",
+            "VILLAGE_INVASION",
+            "VILLAGE_DEFENSE",
+            "PATROL",
+            "RAID",
+            "SILVERFISH_BLOCK",
+            "TRAP",
+            "NETHER_PORTAL",
+            "JOCKEY",
+            "MOUNT",
+            "LIGHTNING",
+            "SLIME_SPLIT",
+            "DROWNED",
+            "INFECTION",
+            "FROZEN",
+            "SPELL",
+            "ENDER_PEARL"
+    );
+
     // Thresholds
+    private double emergencyTps;
     private double criticalTps;
     private double warningTps;
     private double recoveryTps;
+    private double emergencyRam;
     private double criticalRam;
     private double warningRam;
     private double recoveryRam;
+
+    /**
+     * How long the server must remain continuously in CRITICAL before it is
+     * escalated to EMERGENCY, even if the raw metrics never cross the
+     * emergency thresholds. A server pinned at CRITICAL for minutes is, in
+     * practice, an emergency. 0 disables time-based escalation.
+     */
+    private long sustainedCriticalEscalateMs;
 
     // Per-state response configs
     private final Map<ServerState, ResponseConfig> responseConfigs = new ConcurrentHashMap<>();
@@ -149,15 +193,37 @@ public class EmergencyController {
         this.minStateDurationMs = config.getLong("stability.min-state-duration-seconds", 10) * 1000L;
 
         // Thresholds
+        this.emergencyTps = config.getDouble("thresholds.tps.emergency", 10.0);
         this.criticalTps = config.getDouble("thresholds.tps.critical", 15.0);
         this.warningTps = config.getDouble("thresholds.tps.warning", 18.0);
         this.recoveryTps = config.getDouble("thresholds.tps.recovery", 19.0);
+        this.emergencyRam = config.getDouble("thresholds.ram.emergency", 95.0);
         this.criticalRam = config.getDouble("thresholds.ram.critical", 90.0);
         this.warningRam = config.getDouble("thresholds.ram.warning", 85.0);
         this.recoveryRam = config.getDouble("thresholds.ram.recovery", 75.0);
+        this.sustainedCriticalEscalateMs =
+                config.getLong("stability.sustained-critical-escalate-seconds", 120) * 1000L;
+
+        // Sanity-check threshold ordering. Misordered thresholds silently make a
+        // whole tier unreachable, which is the exact class of bug this release fixes,
+        // so fail loudly in the log rather than degrading quietly.
+        validateThresholdOrdering();
 
         // Emergency commands
         this.emergencyCommands = config.getStringList("responses.emergency.emergency-commands");
+
+        // Spawn reasons eligible for suppression. An empty/absent list falls back
+        // to the built-in environmental set rather than silently blocking nothing.
+        this.blockedSpawnReasons.clear();
+        List<String> configuredReasons = config.getStringList("actions.block-natural-spawns.spawn-reasons");
+        if (configuredReasons == null || configuredReasons.isEmpty()) {
+            configuredReasons = DEFAULT_BLOCKED_SPAWN_REASONS;
+        }
+        for (String reason : configuredReasons) {
+            if (reason != null && !reason.trim().isEmpty()) {
+                this.blockedSpawnReasons.add(reason.trim().toUpperCase());
+            }
+        }
 
         // Load per-state response configs
         loadResponseConfig(config, ServerState.WARNING, "responses.warning");
@@ -184,6 +250,43 @@ public class EmergencyController {
         rc.unloadInactivityMinutes = config.getLong(path + ".unload-inactivity-minutes", 15);
         rc.freezeAllAI = config.getBoolean(path + ".freeze-all-ai", false);
         responseConfigs.put(state, rc);
+    }
+
+    /**
+     * Verifies that the configured thresholds are ordered such that every state
+     * is actually reachable, and warns about any tier that has been rendered
+     * unreachable by misconfiguration.
+     */
+    private void validateThresholdOrdering() {
+        java.util.logging.Logger log = LagXpert.getInstance().getLogger();
+
+        if (emergencyTps >= criticalTps) {
+            log.warning("[EmergencyController] thresholds.tps.emergency (" + emergencyTps +
+                    ") must be LOWER than thresholds.tps.critical (" + criticalTps +
+                    "). The EMERGENCY tier may trigger too eagerly.");
+        }
+        if (criticalTps >= warningTps) {
+            log.warning("[EmergencyController] thresholds.tps.critical (" + criticalTps +
+                    ") must be LOWER than thresholds.tps.warning (" + warningTps + ").");
+        }
+        if (warningTps > recoveryTps) {
+            log.warning("[EmergencyController] thresholds.tps.warning (" + warningTps +
+                    ") should not exceed thresholds.tps.recovery (" + recoveryTps +
+                    "), otherwise the server can never return to NORMAL.");
+        }
+        if (emergencyRam <= criticalRam) {
+            log.warning("[EmergencyController] thresholds.ram.emergency (" + emergencyRam +
+                    ") must be HIGHER than thresholds.ram.critical (" + criticalRam + ").");
+        }
+        if (criticalRam <= warningRam) {
+            log.warning("[EmergencyController] thresholds.ram.critical (" + criticalRam +
+                    ") must be HIGHER than thresholds.ram.warning (" + warningRam + ").");
+        }
+        if (recoveryRam > warningRam) {
+            log.warning("[EmergencyController] thresholds.ram.recovery (" + recoveryRam +
+                    ") should not exceed thresholds.ram.warning (" + warningRam +
+                    "), otherwise the server can never return to NORMAL.");
+        }
     }
 
     /**
@@ -247,16 +350,36 @@ public class EmergencyController {
      * Computes the target state purely from current metric values.
      */
     private ServerState computeTargetState(double tps, double ramPercent) {
-        boolean tpsCritical = tps < criticalTps && tps > 0;
-        boolean tpsWarning = tps < warningTps && tps > 0;
+        // A TPS of 0 means "not measured yet" rather than "server frozen", so it is
+        // never treated as a degraded reading.
+        boolean tpsMeasured = tps > 0;
+
+        boolean tpsEmergency = tpsMeasured && tps < emergencyTps;
+        boolean tpsCritical = tpsMeasured && tps < criticalTps;
+        boolean tpsWarning = tpsMeasured && tps < warningTps;
+
+        boolean ramEmergency = ramPercent > emergencyRam;
         boolean ramCritical = ramPercent > criticalRam;
         boolean ramWarning = ramPercent > warningRam;
-        boolean recovered = tps >= recoveryTps && ramPercent <= recoveryRam;
+
+        boolean recovered = tpsMeasured && tps >= recoveryTps && ramPercent <= recoveryRam;
 
         if (recovered) {
             return ServerState.NORMAL;
         }
+        if (tpsEmergency || ramEmergency) {
+            return ServerState.EMERGENCY;
+        }
         if (tpsCritical || ramCritical) {
+            // Time-based escalation: a server that has been stuck in CRITICAL for
+            // longer than the configured window is treated as an emergency even if
+            // the raw metrics never reach the emergency thresholds. Without this,
+            // a server sitting at 12 TPS indefinitely would never escalate.
+            if (sustainedCriticalEscalateMs > 0
+                    && currentState.get() == ServerState.CRITICAL
+                    && (System.currentTimeMillis() - stateEnteredAt.get()) >= sustainedCriticalEscalateMs) {
+                return ServerState.EMERGENCY;
+            }
             return ServerState.CRITICAL;
         }
         if (tpsWarning || ramWarning) {
@@ -409,18 +532,31 @@ public class EmergencyController {
             return;
         }
 
-        LagXpert.getInstance().getLogger().warning(
-                "[EmergencyController] Executing " + emergencyCommands.size() + " emergency command(s)...");
+        final List<String> commands = new java.util.ArrayList<>(emergencyCommands);
 
-        for (String command : emergencyCommands) {
-            try {
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-            } catch (Exception e) {
-                LagXpert.getInstance().getLogger().warning(
-                        "[EmergencyController] Failed to execute emergency command: " + command +
-                                " - " + e.getMessage());
+        LagXpert.getInstance().getLogger().warning(
+                "[EmergencyController] Executing " + commands.size() + " emergency command(s)...");
+
+        // Command dispatch must happen on the main/global thread. State evaluation
+        // runs from the monitoring task, so hop explicitly rather than assuming.
+        me.koyere.lagxpert.utils.SchedulerWrapper.runTask(() -> {
+            for (String command : commands) {
+                boolean success = false;
+                try {
+                    success = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                } catch (Exception e) {
+                    LagXpert.getInstance().getLogger().warning(
+                            "[EmergencyController] Failed to execute emergency command: " + command +
+                                    " - " + e.getMessage());
+                }
+
+                ActionLogger.getInstance().log(
+                        ActionLogger.ActionType.EMERGENCY_COMMAND_EXECUTED,
+                        null, null,
+                        command,
+                        1, "emergency", success, 0);
             }
-        }
+        });
     }
 
     /**
@@ -490,6 +626,27 @@ public class EmergencyController {
 
     public boolean shouldBlockNaturalSpawns() {
         return enabled && cachedBlockNaturalSpawns;
+    }
+
+    /**
+     * Returns true if the given {@code CreatureSpawnEvent.SpawnReason} name is
+     * considered environmental and may be suppressed during an emergency.
+     *
+     * @param spawnReasonName the enum name of the spawn reason, case-insensitive
+     */
+    public boolean isBlockedSpawnReason(String spawnReasonName) {
+        if (spawnReasonName == null) {
+            return false;
+        }
+        return blockedSpawnReasons.contains(spawnReasonName.toUpperCase());
+    }
+
+    /**
+     * Returns an unmodifiable view of the suppressible spawn reasons,
+     * for display in diagnostics output.
+     */
+    public java.util.Set<String> getBlockedSpawnReasons() {
+        return java.util.Collections.unmodifiableSet(blockedSpawnReasons);
     }
 
     public boolean shouldForceItemCleanup() {

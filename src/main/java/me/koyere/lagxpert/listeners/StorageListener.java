@@ -4,6 +4,7 @@ import me.koyere.lagxpert.LagXpert;
 import me.koyere.lagxpert.api.events.ChunkOverloadEvent;
 import me.koyere.lagxpert.cache.ChunkDataCache;
 import me.koyere.lagxpert.system.ActionLogger;
+import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.AlertCooldownManager;
 import me.koyere.lagxpert.tasks.AsyncChunkAnalyzer;
 import me.koyere.lagxpert.utils.ChunkUtils;
@@ -96,10 +97,10 @@ public class StorageListener implements Listener {
         addLimitedBlock(Material.GREEN_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
         addLimitedBlock(Material.RED_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
         addLimitedBlock(Material.BLACK_SHULKER_BOX, world -> ConfigManager.getMaxShulkerBoxesPerChunk(world), "shulker_boxes", "limits.shulker_box", "shulker_boxes", true);
-        addLimitedBlock(Material.TNT, world -> ConfigManager.getMaxTntPerChunk(), "tnt", "limits.tnt", "tnt", false);
-        addLimitedBlock(Material.PISTON, world -> ConfigManager.getMaxPistonsPerChunk(), "pistons", "limits.piston", "pistons", false);
-        addLimitedBlock(Material.STICKY_PISTON, world -> ConfigManager.getMaxPistonsPerChunk(), "pistons", "limits.piston", "pistons", false);
-        addLimitedBlock(Material.OBSERVER, world -> ConfigManager.getMaxObserversPerChunk(), "observers", "limits.observer", "observers", false);
+        addLimitedBlock(Material.TNT, world -> ConfigManager.getMaxTntPerChunk(world), "tnt", "limits.tnt", "tnt", false);
+        addLimitedBlock(Material.PISTON, world -> ConfigManager.getMaxPistonsPerChunk(world), "pistons", "limits.piston", "pistons", false);
+        addLimitedBlock(Material.STICKY_PISTON, world -> ConfigManager.getMaxPistonsPerChunk(world), "pistons", "limits.piston", "pistons", false);
+        addLimitedBlock(Material.OBSERVER, world -> ConfigManager.getMaxObserversPerChunk(world), "observers", "limits.observer", "observers", false);
     }
 
     private static void addLimitedBlock(Material material, ToIntFunction<World> limitFunction, String permSuffix,
@@ -304,13 +305,19 @@ public class StorageListener implements Listener {
         String permissionPrefix = "lagxpert.limits." + config.getOverloadCause().replace("_", ".");
 
         // Check for custom limit permissions (e.g., lagxpert.limits.hoppers.15)
+        // A permission-granted limit is an explicit operator decision for that
+        // player, so it is honored verbatim and not adaptively scaled.
         int customLimit = getCustomLimitFromPermissions(player, permissionPrefix);
         if (customLimit > 0) {
             return customLimit;
         }
 
-        // Fall back to default config limit
-        return config.getLimit(world);
+        // Scale the configured limit by current server health. Under load this
+        // tightens storage placement limits; at full health it returns the
+        // configured value unchanged.
+        return AdaptiveThresholdEngine.getInstance().getEffectiveLimit(
+                AdaptiveThresholdEngine.LimitCategory.STORAGE,
+                config.getLimit(world));
     }
 
     /**

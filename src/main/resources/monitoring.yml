@@ -97,6 +97,12 @@ monitoring:
     # Auto-analyze lag spikes (attempt to identify causes)
     auto-analyze: true
 
+    # Auto-mute: stop sending lag spike alerts after this many consecutive alerts
+    # without TPS recovery. Prevents console spam when server is continuously lagging.
+    # Alerts resume automatically when TPS recovers above the warning threshold.
+    # Set to 0 to disable auto-mute.
+    auto-mute-after-alerts: 5
+
 # Alert system for monitoring
 alerts:
   # Enable/disable monitoring alerts

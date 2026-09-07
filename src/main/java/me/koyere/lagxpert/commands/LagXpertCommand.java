@@ -5,7 +5,10 @@ import me.koyere.lagxpert.system.AbyssManager;
 import me.koyere.lagxpert.system.ActionLogger;
 import me.koyere.lagxpert.system.AdaptiveThresholdEngine;
 import me.koyere.lagxpert.system.EmergencyController;
+import me.koyere.lagxpert.system.EmergencyResponseCoordinator;
+import me.koyere.lagxpert.system.LagDiagnosticsEngine;
 import me.koyere.lagxpert.system.PerformanceHistory;
+import me.koyere.lagxpert.system.ProfileManager;
 import me.koyere.lagxpert.monitoring.TPSMonitor;
 import me.koyere.lagxpert.utils.ConfigManager;
 import me.koyere.lagxpert.utils.MessageManager;
@@ -44,7 +47,11 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
     // A list of root subcommands for easy management and tab-completion.
     private static final List<String> ROOT_SUBCOMMANDS = Arrays.asList(
             "help", "reload", "inspect", "chunkload",
-            "optimize", "status", "emergency");
+            "optimize", "status", "emergency", "profile", "diagnose");
+
+    /** Subcommands that require the general admin permission. */
+    private static final List<String> ADMIN_SUBCOMMANDS = Arrays.asList(
+            "reload", "inspect", "optimize", "status", "emergency", "profile", "diagnose");
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -84,6 +91,10 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
                 return handleStatus(sender);
             case "emergency":
                 return handleEmergency(sender, args);
+            case "profile":
+                return handleProfile(sender, args);
+            case "diagnose":
+                return handleDiagnose(sender, args);
             default:
                 // Handle any unknown subcommands.
                 sender.sendMessage(MessageManager.getPrefixedMessage("general.invalid-command"));
@@ -96,82 +107,107 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
      * Shows a text dashboard with server health, recent actions, and trends.
      */
     private boolean handleStatus(CommandSender sender) {
-        if (!sender.hasPermission("lagxpert.admin")) {
+        if (!canRunAdminSubcommand(sender, "status")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
             return true;
         }
 
-        String sep = MessageManager.color("&8&m------------------------------------------");
+        // Every line is driven by messages.yml so the dashboard can be translated,
+        // matching the convention the rest of the plugin already follows.
+        String sep = MessageManager.get("status.separator");
         sender.sendMessage(sep);
-        sender.sendMessage(MessageManager.color("&b&lLagXpert Status Dashboard"));
+        sender.sendMessage(MessageManager.get("status.header"));
         sender.sendMessage(sep);
 
-        // Server State
-        EmergencyController.ServerState state = EmergencyController.getInstance().getCurrentState();
-        String stateColor = state == EmergencyController.ServerState.NORMAL ? "&a" :
-                state == EmergencyController.ServerState.WARNING ? "&e" :
-                        state == EmergencyController.ServerState.CRITICAL ? "&c" : "&4";
-        sender.sendMessage(MessageManager.color(
-                "&7Server State: " + stateColor + state.name()));
+        // Server state
+        EmergencyController controller = EmergencyController.getInstance();
+        EmergencyController.ServerState state = controller.getCurrentState();
+        sender.sendMessage(MessageManager.getFormatted("status.server-state", mapOf(
+                "state", state.name(),
+                "state_color", stateColorCode(state))));
 
         // TPS
         double tps = TPSMonitor.getCurrentTPS();
-        String tpsColor = tps >= 19 ? "&a" : tps >= 16 ? "&e" : "&c";
-        sender.sendMessage(MessageManager.color(
-                "&7TPS: " + tpsColor + String.format("%.1f", tps) + " &7/ 20.0"));
+        sender.sendMessage(MessageManager.getFormatted("status.tps", mapOf(
+                "tps", String.format("%.2f", tps),
+                "tps_color", tps >= 19 ? "&a" : tps >= 16 ? "&e" : "&c")));
 
         // Memory
         long maxMem = Runtime.getRuntime().maxMemory();
         long usedMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         double memPct = maxMem > 0 ? (double) usedMem / maxMem * 100.0 : 0;
-        String memColor = memPct < 70 ? "&a" : memPct < 85 ? "&e" : "&c";
-        sender.sendMessage(MessageManager.color(
-                "&7Memory: " + memColor + String.format("%.1f%%", memPct) +
-                        " &7(" + usedMem / 1024 / 1024 + "MB)"));
+        sender.sendMessage(MessageManager.getFormatted("status.memory", mapOf(
+                "percent", String.format("%.1f", memPct),
+                "used", usedMem / 1024 / 1024,
+                "max", maxMem / 1024 / 1024,
+                "mem_color", memPct < 70 ? "&a" : memPct < 85 ? "&e" : "&c")));
+
+        // Active profile, since it explains why the limits are what they are
+        String activeProfile = ProfileManager.getInstance().getActiveProfile();
+        sender.sendMessage(MessageManager.getFormatted("status.profile", mapOf(
+                "profile", activeProfile == null ? "none" : activeProfile)));
         sender.sendMessage("");
 
-        // Adaptive Thresholds
-        AdaptiveThresholdEngine ate = AdaptiveThresholdEngine.getInstance();
-        sender.sendMessage(MessageManager.color("&eAdaptive Multipliers:"));
-        sender.sendMessage(MessageManager.color(
-                "  &7Health Factor: &f" + String.format("%.2f", ate.getHealthFactor())));
-        sender.sendMessage(MessageManager.color(
-                "  &7Mob Limit: &f" + String.format("%.0f%%", ate.getMobMultiplier() * 100)));
-        sender.sendMessage(MessageManager.color(
-                "  &7Storage Limit: &f" + String.format("%.0f%%", ate.getStorageMultiplier() * 100)));
+        // Limits actually being enforced right now
+        AdaptiveThresholdEngine adaptive = AdaptiveThresholdEngine.getInstance();
+        sender.sendMessage(MessageManager.get("status.limits-header"));
+        sender.sendMessage(MessageManager.getFormatted("status.limits-health", mapOf(
+                "health", String.format("%.2f", adaptive.getHealthFactor()))));
+        sender.sendMessage(MessageManager.getFormatted("status.limits-values", mapOf(
+                "mobs", String.format("%.0f%%", adaptive.getMobMultiplier() * 100),
+                "storage", String.format("%.0f%%", adaptive.getStorageMultiplier() * 100),
+                "entities", String.format("%.0f%%", adaptive.getEntityMultiplier() * 100),
+                "redstone", String.format("%.0f%%", adaptive.getRedstoneMultiplier() * 100))));
+        sender.sendMessage(adaptive.isCurrentlyThrottling()
+                ? MessageManager.get("status.limits-throttling")
+                : MessageManager.get("status.limits-normal"));
         sender.sendMessage("");
 
-        // Recent Actions
+        // Which emergency responses are currently in force
+        sender.sendMessage(MessageManager.get("status.emergency-header"));
+        sender.sendMessage(MessageManager.getFormatted("status.emergency-values", mapOf(
+                "spawns", yesNo(controller.shouldBlockNaturalSpawns()),
+                "ai", yesNo(EmergencyResponseCoordinator.getInstance().isAiCurrentlyFrozen()),
+                "preloader", controller.shouldPauseChunkPreloader() ? "&cpaused" : "&arunning",
+                "redstone", controller.shouldDisableRedstoneClocks() ? "&cdisabled" : "&aallowed")));
+        sender.sendMessage("");
+
+        // Recent corrective actions
         java.util.List<ActionLogger.ActionRecord> recent = ActionLogger.getInstance().getRecent(5);
-        sender.sendMessage(MessageManager.color("&eRecent Actions:"));
+        sender.sendMessage(MessageManager.get("status.actions-header"));
         if (recent.isEmpty()) {
-            sender.sendMessage(MessageManager.color("  &7No actions recorded yet."));
+            sender.sendMessage(MessageManager.get("status.actions-none"));
         } else {
             for (ActionLogger.ActionRecord record : recent) {
-                String age = formatAge(System.currentTimeMillis() - record.getTimestamp());
-                sender.sendMessage(MessageManager.color(
-                        "  &7• &f" + record.getType().name() +
-                                " &7(" + record.getCount() + ") &8" + age + " ago"));
+                sender.sendMessage(MessageManager.getFormatted("status.actions-entry", mapOf(
+                        "type", record.getType().name(),
+                        "count", record.getCount(),
+                        "age", formatAge(System.currentTimeMillis() - record.getTimestamp()))));
             }
         }
         sender.sendMessage("");
 
-        // Performance Trends
-        PerformanceHistory ph = PerformanceHistory.getInstance();
-        sender.sendMessage(MessageManager.color("&ePerformance Trends:"));
-        sender.sendMessage(MessageManager.color(
-                "  &7Snapshots: &f" + ph.getSnapshotCount()));
-        sender.sendMessage(MessageManager.color(
-                "  &7Peak Players: &f" + ph.getPeakPlayerCount()));
-        sender.sendMessage(MessageManager.color(
-                "  &7Peak Lag Hour: &f" + ph.getPeakLagHour() + ":00" +
-                        " &7(TPS: " + String.format("%.1f", ph.getAverageTpsForHour(ph.getPeakLagHour())) + ")"));
+        // Historical trends
+        PerformanceHistory history = PerformanceHistory.getInstance();
+        sender.sendMessage(MessageManager.get("status.trends-header"));
+        sender.sendMessage(MessageManager.getFormatted("status.trends-summary", mapOf(
+                "snapshots", history.getSnapshotCount(),
+                "peak_players", history.getPeakPlayerCount())));
 
-        PerformanceHistory.TrendAnalysis trend = ph.getEntityTrend(6);
-        sender.sendMessage(MessageManager.color(
-                "  &7Entity Trend: &f" + trend.getDirection() +
-                        " &7(" + String.format("%.0f", trend.getHourlyChange()) + "/hr)"));
+        if (history.getSnapshotCount() > 0) {
+            int peakHour = history.getPeakLagHour();
+            sender.sendMessage(MessageManager.getFormatted("status.trends-peak-hour", mapOf(
+                    "hour", peakHour,
+                    "tps", String.format("%.2f", history.getAverageTpsForHour(peakHour)))));
 
+            PerformanceHistory.TrendAnalysis trend = history.getEntityTrend(6);
+            sender.sendMessage(MessageManager.getFormatted("status.trends-entities", mapOf(
+                    "direction", trend.getDirection(),
+                    "change", String.format("%+.0f", trend.getHourlyChange()))));
+        }
+
+        sender.sendMessage("");
+        sender.sendMessage(MessageManager.get("status.hint"));
         sender.sendMessage(sep);
         return true;
     }
@@ -182,7 +218,7 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
      * /lagxpert emergency force-normal — forces return to NORMAL state
      */
     private boolean handleEmergency(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("lagxpert.admin.emergency")) {
+        if (!canRunAdminSubcommand(sender, "emergency")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
             return true;
         }
@@ -238,6 +274,203 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /**
+     * Handles the /lagxpert diagnose subcommand.
+     *
+     * /lagxpert diagnose            — opens the GUI for players, prints for console
+     * /lagxpert diagnose chat       — force the text report even in-game
+     * /lagxpert diagnose refresh    — force a fresh scan
+     */
+    private boolean handleDiagnose(CommandSender sender, String[] args) {
+        if (!canRunAdminSubcommand(sender, "diagnose")) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
+            return true;
+        }
+
+        boolean forceRescan = args.length > 1 && args[1].equalsIgnoreCase("refresh");
+        boolean forceChat = args.length > 1 && args[1].equalsIgnoreCase("chat");
+
+        boolean useGui = (sender instanceof org.bukkit.entity.Player) && !forceChat;
+
+        if (useGui) {
+            org.bukkit.entity.Player player = (org.bukkit.entity.Player) sender;
+            me.koyere.lagxpert.gui.GUIManager.getInstance().openDiagnosticsGUI(player, forceRescan);
+            return true;
+        }
+
+        // Text path: console, or a player who explicitly asked for chat output.
+        LagDiagnosticsEngine engine = LagDiagnosticsEngine.getInstance();
+
+        LagDiagnosticsEngine.DiagnosticsReport cached =
+                forceRescan ? null : engine.getCachedReport();
+        if (cached != null) {
+            me.koyere.lagxpert.gui.DiagnosticsGUI.sendChatReport(sender, cached, 10);
+            return true;
+        }
+
+        sender.sendMessage(MessageManager.getPrefixedMessage("diagnostics.scanning"));
+
+        engine.requestReport(forceRescan, report -> {
+            if (report == null) {
+                sender.sendMessage(MessageManager.getPrefixedMessage("diagnostics.scan-in-progress"));
+                return;
+            }
+            me.koyere.lagxpert.gui.DiagnosticsGUI.sendChatReport(sender, report, 10);
+        });
+        return true;
+    }
+
+    /**
+     * Single source of truth for whether a sender may use an admin subcommand.
+     *
+     * Help output, tab completion and the handlers all consult this method. When
+     * they each had their own check, the help menu advertised commands that the
+     * execution path then refused.
+     *
+     * A holder of the broad {@code lagxpert.admin} node can use everything; the
+     * finer-grained nodes exist so a limited admin can be granted just one action.
+     */
+    private static boolean canRunAdminSubcommand(CommandSender sender, String subCommand) {
+        if (sender.hasPermission("lagxpert.admin")) {
+            return true;
+        }
+        switch (subCommand.toLowerCase()) {
+            case "optimize":
+                return sender.hasPermission("lagxpert.admin.optimize");
+            case "emergency":
+                return sender.hasPermission("lagxpert.admin.emergency");
+            case "profile":
+                return sender.hasPermission(ProfileManager.getInstance().getRequiredPermission());
+            case "diagnose":
+                return sender.hasPermission("lagxpert.admin.diagnostics");
+            case "status":
+                return sender.hasPermission("lagxpert.admin.status");
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Handles the /lagxpert profile subcommand.
+     *
+     * /lagxpert profile                — shows the active profile and the list
+     * /lagxpert profile list           — lists available profiles
+     * /lagxpert profile &lt;name&gt;   — applies a profile
+     * /lagxpert profile revert         — restores the pre-profile configuration
+     */
+    private boolean handleProfile(CommandSender sender, String[] args) {
+        ProfileManager manager = ProfileManager.getInstance();
+
+        // The required permission is operator-configurable in profiles.yml.
+        String permission = manager.getRequiredPermission();
+        if (!sender.hasPermission(permission)) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
+            return true;
+        }
+
+        if (args.length < 2 || args[1].equalsIgnoreCase("list")) {
+            sendProfileList(sender, manager);
+            return true;
+        }
+
+        String action = args[1].toLowerCase();
+
+        if (action.equals("revert")) {
+            ProfileManager.ApplyResult result = manager.revert(sender.getName());
+            sender.sendMessage(MessageManager.getPrefix() + MessageManager.color(
+                    (result.isSuccess() ? "&a" : "&c") + result.getMessage()));
+            return true;
+        }
+
+        if (!manager.hasProfile(action)) {
+            java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+            placeholders.put("profile", args[1]);
+            placeholders.put("available", String.join(", ", manager.getProfileNames()));
+            sender.sendMessage(MessageManager.getPrefixedFormattedMessage(
+                    "profile.unknown", placeholders));
+            return true;
+        }
+
+        ProfileManager.ApplyResult result = manager.apply(action, sender.getName());
+        sender.sendMessage(MessageManager.getPrefix() + MessageManager.color(
+                (result.isSuccess() ? "&a" : "&c") + result.getMessage()));
+
+        if (result.isSuccess()) {
+            if (manager.getAutoRevertMinutes() > 0) {
+                java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+                placeholders.put("minutes", manager.getAutoRevertMinutes());
+                sender.sendMessage(MessageManager.getPrefixedFormattedMessage(
+                        "profile.auto-revert-notice", placeholders));
+            }
+            if (!result.getUnknownKeys().isEmpty()) {
+                java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+                placeholders.put("keys", String.join(", ", result.getUnknownKeys()));
+                sender.sendMessage(MessageManager.getPrefixedFormattedMessage(
+                        "profile.unknown-keys", placeholders));
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Prints the available profiles and which one is currently active.
+     */
+    private void sendProfileList(CommandSender sender, ProfileManager manager) {
+        sender.sendMessage(MessageManager.color("&8&m------------------------------------------"));
+        sender.sendMessage(MessageManager.get("profile.header"));
+
+        String active = manager.getActiveProfile();
+        if (active == null) {
+            sender.sendMessage(MessageManager.get("profile.none-active"));
+        } else {
+            java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+            placeholders.put("profile", active);
+            placeholders.put("by", manager.getAppliedBy() == null ? "unknown" : manager.getAppliedBy());
+            placeholders.put("age", formatAge(System.currentTimeMillis() - manager.getActiveSince()));
+            sender.sendMessage(MessageManager.getFormatted("profile.active", placeholders));
+        }
+
+        sender.sendMessage("");
+        for (String name : manager.getProfileNames()) {
+            java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+            placeholders.put("profile", name);
+            placeholders.put("description", manager.getDescription(name));
+            placeholders.put("marker", name.equalsIgnoreCase(active) ? "&a\u25b6 " : "&7\u2022 ");
+            sender.sendMessage(MessageManager.getFormatted("profile.list-entry", placeholders));
+        }
+
+        sender.sendMessage("");
+        sender.sendMessage(MessageManager.get("profile.usage"));
+        sender.sendMessage(MessageManager.color("&8&m------------------------------------------"));
+    }
+
+    /**
+     * Builds a placeholder map from alternating key/value arguments.
+     *
+     * Keeps the status dashboard readable; Java 11 has no map literal.
+     */
+    private static java.util.Map<String, Object> mapOf(Object... keyValuePairs) {
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        for (int i = 0; i + 1 < keyValuePairs.length; i += 2) {
+            map.put(String.valueOf(keyValuePairs[i]), keyValuePairs[i + 1]);
+        }
+        return map;
+    }
+
+    private static String stateColorCode(EmergencyController.ServerState state) {
+        switch (state) {
+            case NORMAL: return "&a";
+            case WARNING: return "&e";
+            case CRITICAL: return "&c";
+            case EMERGENCY: return "&4";
+            default: return "&7";
+        }
+    }
+
+    private static String yesNo(boolean value) {
+        return value ? "&cyes" : "&ano";
+    }
+
     private String formatAge(long ms) {
         if (ms < 60000) return (ms / 1000) + "s";
         if (ms < 3600000) return (ms / 60000) + "m";
@@ -279,11 +512,25 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
         if (sender.hasPermission("lagxpert.clearitems")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("help.clearitems"));
         }
-        if (sender.hasPermission("lagxpert.admin")) { // Admin-specific commands
+        // Each admin line is gated by the same check the handler uses, so nothing
+        // is advertised that the sender cannot actually run.
+        if (sender.hasPermission("lagxpert.admin")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("help.reload"));
+        }
+        if (canRunAdminSubcommand(sender, "optimize")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("help.optimize"));
+        }
+        if (canRunAdminSubcommand(sender, "status")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("help.status"));
+        }
+        if (canRunAdminSubcommand(sender, "emergency")) {
             sender.sendMessage(MessageManager.getPrefixedMessage("help.emergency"));
+        }
+        if (canRunAdminSubcommand(sender, "profile")) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("help.profile"));
+        }
+        if (canRunAdminSubcommand(sender, "diagnose")) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("help.diagnose"));
         }
         sender.sendMessage(headerFooter);
     }
@@ -301,11 +548,27 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // Reload all plugin configurations.
-        ConfigManager.loadAll();    // This reloads all YAMLs and re-initializes MessageManager.
-        AbyssManager.loadConfig();  // AbyssManager fetches its reloaded config values from ConfigManager.
+        // Reload every config file AND re-apply it to every subsystem. Reloading
+        // ConfigManager alone is not enough: several subsystems read their own YAML
+        // directly and would otherwise keep serving startup values.
+        java.util.List<String> failures = LagXpert.getInstance().reloadAllConfigurations();
 
-        sender.sendMessage(MessageManager.getPrefixedMessage("general.config-reloaded")); // Confirmation message.
+        if (failures.isEmpty()) {
+            sender.sendMessage(MessageManager.getPrefixedMessage("general.config-reloaded"));
+        } else {
+            java.util.Map<String, Object> placeholders = new java.util.HashMap<>();
+            placeholders.put("count", failures.size());
+            placeholders.put("subsystems", String.join(", ", failures));
+            sender.sendMessage(MessageManager.getPrefixedFormattedMessage(
+                    "general.config-reloaded-partial", placeholders));
+        }
+
+        ActionLogger.getInstance().log(
+                ActionLogger.ActionType.MANUAL_RELOAD,
+                null, null,
+                failures.isEmpty() ? "Full reload" : "Reload with failures: " + failures,
+                1, "player:" + sender.getName(), failures.isEmpty(), 0);
+
         if (LagXpert.getInstance() != null) {
             LagXpert.getInstance().getLogger().info("LagXpert configurations reloaded by " + sender.getName() + ".");
         }
@@ -319,20 +582,54 @@ public class LagXpertCommand implements CommandExecutor, TabCompleter {
             String currentArg = args[0].toLowerCase();
             List<String> completions = new ArrayList<>();
             for (String sub : ROOT_SUBCOMMANDS) {
-                if (sub.toLowerCase().startsWith(currentArg)) {
-                    // Permission-based tab completion
-                    if (sub.equalsIgnoreCase("reload") || sub.equalsIgnoreCase("inspect")
-                            || sub.equalsIgnoreCase("optimize") || sub.equalsIgnoreCase("status")
-                            || sub.equalsIgnoreCase("emergency")) {
-                        if (sender.hasPermission("lagxpert.admin")) {
-                            completions.add(sub);
-                        }
-                    } else { // For help, chunkload (which is just a message)
+                if (!sub.toLowerCase().startsWith(currentArg)) {
+                    continue;
+                }
+                // Only suggest what the sender can actually run. The check must match
+                // the one performed at execution time, otherwise the command is
+                // advertised and then refused.
+                if (ADMIN_SUBCOMMANDS.contains(sub)) {
+                    if (canRunAdminSubcommand(sender, sub)) {
                         completions.add(sub);
                     }
+                } else { // help, chunkload
+                    completions.add(sub);
                 }
             }
             return completions;
+        }
+
+        // Tab completion for /lagxpert profile <name|list|revert>
+        if (args[0].equalsIgnoreCase("profile") && args.length == 2) {
+            ProfileManager manager = ProfileManager.getInstance();
+            if (!sender.hasPermission(manager.getRequiredPermission())) {
+                return Collections.emptyList();
+            }
+            List<String> options = new ArrayList<>(manager.getProfileNames());
+            options.add("list");
+            options.add("revert");
+            String current = args[1].toLowerCase();
+            return options.stream()
+                    .filter(o -> o.toLowerCase().startsWith(current))
+                    .collect(Collectors.toList());
+        }
+
+        // Tab completion for /lagxpert diagnose <chat|refresh>
+        if (args[0].equalsIgnoreCase("diagnose") && args.length == 2
+                && canRunAdminSubcommand(sender, "diagnose")) {
+            String current = args[1].toLowerCase();
+            return Arrays.asList("chat", "refresh").stream()
+                    .filter(o -> o.startsWith(current))
+                    .collect(Collectors.toList());
+        }
+
+        // Tab completion for /lagxpert emergency <status|force-normal>
+        if (args[0].equalsIgnoreCase("emergency") && args.length == 2
+                && sender.hasPermission("lagxpert.admin.emergency")) {
+            String current = args[1].toLowerCase();
+            return Arrays.asList("status", "force-normal").stream()
+                    .filter(o -> o.startsWith(current))
+                    .collect(Collectors.toList());
         }
 
         // Tab completion for /lagxpert inspect <x> <z> [world]

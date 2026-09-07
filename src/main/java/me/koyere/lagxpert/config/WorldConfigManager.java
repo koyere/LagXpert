@@ -215,7 +215,9 @@ public class WorldConfigManager {
         // Lower limits for nether due to hostile environment
         config.set("limits.mobs-per-chunk", 25);
         config.set("limits.hoppers-per-chunk", 6);
-        config.set("limits.tnt-per-chunk", 0); // No TNT in nether by default
+        // Deliberately 1, not 0: a limit of 0 means "no limit" everywhere in this
+        // plugin, so 0 would grant the nether unlimited TNT rather than restrict it.
+        config.set("limits.tnt-per-chunk", 1);
 
         // More aggressive entity cleanup in nether
         config.set("entity-cleanup.cleanup-targets.abandoned-vehicles", true);
@@ -393,6 +395,18 @@ public class WorldConfigManager {
 
     public static int getObserversPerChunk(World world) {
         return getWorldValue(world, "limits.observers-per-chunk", ConfigManager.getMaxObserversPerChunk(), Integer.class);
+    }
+
+    /**
+     * Per-world ceiling on total entities in a single chunk.
+     *
+     * Backed by {@code entity-cleanup.advanced.max-entities-per-chunk}, which is
+     * the path the world templates already used, so an existing override such as
+     * the nether template's 150 starts working without any file changes.
+     */
+    public static int getMaxEntitiesPerChunk(World world) {
+        return getWorldValue(world, "entity-cleanup.advanced.max-entities-per-chunk",
+                ConfigManager.getMaxEntitiesPerChunk(), Integer.class);
     }
 
     // TPS monitoring thresholds

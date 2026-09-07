@@ -24,6 +24,7 @@ public class GUIManager {
 
     // GUI instances
     private ConfigGUI configGUI;
+    private DiagnosticsGUI diagnosticsGUI;
 
     // Track active GUI sessions
     private final Map<UUID, String> activeSessions = new HashMap<>();
@@ -39,6 +40,7 @@ public class GUIManager {
     private GUIManager() {
         // Initialize GUI components
         this.configGUI = new ConfigGUI();
+        this.diagnosticsGUI = new DiagnosticsGUI();
     }
 
     /**
@@ -71,6 +73,7 @@ public class GUIManager {
 
             // Register event listeners
             Bukkit.getPluginManager().registerEvents(manager.configGUI, plugin);
+            Bukkit.getPluginManager().registerEvents(manager.diagnosticsGUI, plugin);
 
             // Start session cleanup task
             manager.startSessionCleanupTask(plugin);
@@ -100,10 +103,12 @@ public class GUIManager {
 
             // Unregister event listeners
             HandlerList.unregisterAll(manager.configGUI);
+            HandlerList.unregisterAll(manager.diagnosticsGUI);
 
             // Clear all tracking data
             manager.activeSessions.clear();
             manager.sessionStartTimes.clear();
+            DiagnosticsGUI.clearAll();
 
             initialized = false;
 
@@ -157,6 +162,37 @@ public class GUIManager {
         } catch (Exception e) {
             LagXpert.getInstance().getLogger().log(Level.WARNING,
                     "Failed to open config GUI for player " + player.getName(), e);
+            player.sendMessage(MessageManager.getPrefixedMessage("general.error-occurred"));
+            return false;
+        }
+    }
+
+    /**
+     * Opens the lag diagnostics interface for a player.
+     *
+     * Unlike {@link #openConfigGUI}, this does not register a manager session.
+     * The diagnostics screens navigate by closing and reopening inventories, and a
+     * manager session would be ended by the first such transition. Diagnostics is
+     * also read-only, so the concurrency limit that protects configuration editing
+     * does not apply.
+     *
+     * @param player      the player to open the interface for
+     * @param forceRescan ignore any recently cached report
+     * @return true if the request was accepted
+     */
+    public boolean openDiagnosticsGUI(Player player, boolean forceRescan) {
+        if (!player.hasPermission("lagxpert.admin")
+                && !player.hasPermission("lagxpert.admin.diagnostics")) {
+            player.sendMessage(MessageManager.getPrefixedMessage("general.no-permission"));
+            return false;
+        }
+
+        try {
+            DiagnosticsGUI.open(player, forceRescan);
+            return true;
+        } catch (Exception e) {
+            LagXpert.getInstance().getLogger().log(Level.WARNING,
+                    "Failed to open diagnostics GUI for player " + player.getName(), e);
             player.sendMessage(MessageManager.getPrefixedMessage("general.error-occurred"));
             return false;
         }
