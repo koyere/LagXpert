@@ -27,8 +27,20 @@ import java.util.Map;
  */
 public class ConfigMigrator {
     
-    private static final String CURRENT_VERSION = "2.2";
+    /**
+     * Configuration schema version this build understands.
+     *
+     * Must be kept in step with the {@code config-version} shipped in
+     * config.yml. Leaving it stale is what caused this class to report
+     * "migrating from v2.7 to v2.2" and to create a fresh backup folder on
+     * every single server start.
+     */
+    private static final String CURRENT_VERSION = "2.7";
+
     private static final String VERSION_KEY = "config-version";
+
+    /** Prefix used for the backup folders this class creates. */
+    static final String BACKUP_PREFIX = "config-backup-v";
     
     /**
      * Performs automatic migration of all configuration files if needed.
@@ -45,21 +57,52 @@ public class ConfigMigrator {
             
             FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
             String currentConfigVersion = config.getString(VERSION_KEY, "2.1.1");
-            
-            if (needsMigration(currentConfigVersion)) {
-                LagXpert.getInstance().getLogger().info("[ConfigMigrator] Migrating configurations from v" + currentConfigVersion + " to v" + CURRENT_VERSION);
-                
-                // Create backup
-                createConfigBackup(currentConfigVersion);
-                
-                // Perform migration based on current version
-                if (isVersion21x(currentConfigVersion)) {
-                    migrateFrom21xTo22x();
-                }
-                
-                LagXpert.getInstance().getLogger().info("[ConfigMigrator] Configuration migration completed successfully!");
+
+            int comparison = compareVersions(currentConfigVersion, CURRENT_VERSION);
+
+            if (comparison > 0) {
+                // The config was written by a NEWER build than this one. Migrating
+                // would be a downgrade, so refuse and leave everything untouched.
+                LagXpert.getInstance().getLogger().warning(
+                        "[ConfigMigrator] Configuration is version v" + currentConfigVersion +
+                                " but this build expects v" + CURRENT_VERSION +
+                                ". Refusing to downgrade; no changes made. " +
+                                "If you rolled the plugin back, restore your configuration backup.");
+                return;
             }
-            
+
+            if (comparison == 0) {
+                // Already current. Nothing to do, and crucially no backup created.
+                return;
+            }
+
+            // Only older configurations reach this point.
+            if (!hasMigrationPathFrom(currentConfigVersion)) {
+                // Nothing this class knows how to transform. Stamp the version so the
+                // check does not repeat forever, but do not touch anything else and do
+                // not create a backup for a no-op.
+                LagXpert.getInstance().getLogger().info(
+                        "[ConfigMigrator] Configuration v" + currentConfigVersion +
+                                " needs no structural changes for v" + CURRENT_VERSION +
+                                "; new keys will use their defaults.");
+                stampVersion();
+                return;
+            }
+
+            LagXpert.getInstance().getLogger().info("[ConfigMigrator] Migrating configurations from v" + currentConfigVersion + " to v" + CURRENT_VERSION);
+
+            // Create backup only when a real migration is about to run.
+            createConfigBackup(currentConfigVersion);
+
+            if (isVersion21x(currentConfigVersion)) {
+                migrateFrom21xTo22x();
+            }
+
+            // Always finish on the current schema version, whatever path ran.
+            stampVersion();
+
+            LagXpert.getInstance().getLogger().info("[ConfigMigrator] Configuration migration completed successfully!");
+
         } catch (Exception e) {
             LagXpert.getInstance().getLogger().severe("[ConfigMigrator] Failed to migrate configurations: " + e.getMessage());
             e.printStackTrace();
@@ -67,17 +110,115 @@ public class ConfigMigrator {
     }
     
     /**
-     * Checks if migration is needed based on version comparison.
+     * Compares two dotted version strings numerically.
+     *
+     * Replaces the previous string-inequality check, which treated any version
+     * that was not literally equal to the target as needing migration. That made
+     * a newer configuration look like an older one and triggered a bogus
+     * "migration" plus a backup folder on every startup.
+     *
+     * Missing components are treated as zero, so {@code 2.7} and {@code 2.7.0}
+     * compare equal. Non-numeric components are treated as zero rather than
+     * throwing, because a hand-edited version string must not break startup.
+     *
+     * @return negative if {@code a} is older, zero if equal, positive if newer
      */
-    private static boolean needsMigration(String currentVersion) {
-        return !CURRENT_VERSION.equals(currentVersion);
+    static int compareVersions(String a, String b) {
+        if (a == null) a = "0";
+        if (b == null) b = "0";
+
+        String[] left = a.trim().split("\\.");
+        String[] right = b.trim().split("\\.");
+        int length = Math.max(left.length, right.length);
+
+        for (int i = 0; i < length; i++) {
+            int l = parseComponent(i < left.length ? left[i] : "0");
+            int r = parseComponent(i < right.length ? right[i] : "0");
+            if (l != r) {
+                return l < r ? -1 : 1;
+            }
+        }
+        return 0;
     }
-    
+
+    private static int parseComponent(String raw) {
+        try {
+            // Tolerate suffixes such as "2.7-SNAPSHOT" by keeping leading digits only.
+            StringBuilder digits = new StringBuilder();
+            for (char c : raw.trim().toCharArray()) {
+                if (Character.isDigit(c)) {
+                    digits.append(c);
+                } else {
+                    break;
+                }
+            }
+            return digits.length() == 0 ? 0 : Integer.parseInt(digits.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /**
-     * Checks if current version is from 2.1.x series.
+     * Returns true when this class has an actual transformation to apply for the
+     * given older configuration version.
+     *
+     * Versions newer than the last structural change need no transformation:
+     * Bukkit supplies defaults for keys that are simply absent, so the only work
+     * required is stamping the version forward.
+     */
+    private static boolean hasMigrationPathFrom(String version) {
+        return isVersion21x(version);
+    }
+
+    /**
+     * Checks if current version is from the 2.1.x series or older.
+     *
+     * Null-tolerant: an operator who empties the {@code config-version:} line by
+     * hand must not cause a startup failure.
      */
     private static boolean isVersion21x(String version) {
-        return version.startsWith("2.1") || version.equals("2.0") || version.startsWith("1.");
+        if (version == null) {
+            return false;
+        }
+        String trimmed = version.trim();
+        return trimmed.startsWith("2.1") || trimmed.equals("2.0") || trimmed.startsWith("1.");
+    }
+
+    /**
+     * Writes the current schema version into config.yml without touching
+     * anything else, so the migration check does not repeat on every startup.
+     */
+    private static void stampVersion() {
+        try {
+            File configFile = new File(LagXpert.getInstance().getDataFolder(), "config.yml");
+            if (!configFile.exists()) {
+                return;
+            }
+            FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+            config.set(VERSION_KEY, CURRENT_VERSION);
+            config.save(configFile);
+        } catch (IOException e) {
+            LagXpert.getInstance().getLogger().warning(
+                    "[ConfigMigrator] Could not update " + VERSION_KEY + " in config.yml: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Counts the backup folders this class has previously created.
+     *
+     * Used to warn operators who accumulated backups while the stale version
+     * constant was creating one on every restart. Nothing is deleted
+     * automatically; removing a backup is the operator's decision.
+     */
+    private static int countExistingBackups() {
+        try {
+            File dataFolder = LagXpert.getInstance().getDataFolder();
+            File[] entries = dataFolder.listFiles(
+                    (dir, name) -> name.startsWith(BACKUP_PREFIX) && new File(dir, name).isDirectory());
+            return entries == null ? 0 : entries.length;
+        } catch (Exception e) {
+            return 0;
+        }
     }
     
     /**
@@ -85,8 +226,17 @@ public class ConfigMigrator {
      */
     private static void createConfigBackup(String currentVersion) {
         try {
+            // Warn if backups have piled up. Earlier builds created one on every
+            // startup because of the stale version constant.
+            int existing = countExistingBackups();
+            if (existing >= 5) {
+                LagXpert.getInstance().getLogger().warning(
+                        "[ConfigMigrator] " + existing + " configuration backup folder(s) already exist in " +
+                                "the LagXpert data folder. They are safe to delete once you no longer need them.");
+            }
+
             String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
-            String backupFolder = "config-backup-v" + currentVersion + "_" + timestamp;
+            String backupFolder = BACKUP_PREFIX + currentVersion + "_" + timestamp;
             
             File backupDir = new File(LagXpert.getInstance().getDataFolder(), backupFolder);
             if (!backupDir.exists()) {
@@ -344,21 +494,26 @@ public class ConfigMigrator {
     }
     
     /**
-     * Checks if configurations are up to date.
+     * Checks if configurations are at or beyond the expected schema version.
      */
     public static boolean isConfigUpToDate() {
-        return CURRENT_VERSION.equals(getCurrentConfigVersion());
+        return compareVersions(getCurrentConfigVersion(), CURRENT_VERSION) >= 0;
     }
-    
+
     /**
      * Gets migration status information.
      */
     public static Map<String, Object> getMigrationInfo() {
+        String configVersion = getCurrentConfigVersion();
+        int comparison = compareVersions(configVersion, CURRENT_VERSION);
+
         Map<String, Object> info = new HashMap<>();
         info.put("current_version", CURRENT_VERSION);
-        info.put("config_version", getCurrentConfigVersion());
-        info.put("is_up_to_date", isConfigUpToDate());
-        info.put("needs_migration", needsMigration(getCurrentConfigVersion()));
+        info.put("config_version", configVersion);
+        info.put("is_up_to_date", comparison >= 0);
+        info.put("needs_migration", comparison < 0);
+        info.put("is_newer_than_plugin", comparison > 0);
+        info.put("existing_backups", countExistingBackups());
         return info;
     }
 }
